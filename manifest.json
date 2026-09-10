@@ -1,0 +1,24 @@
+{
+  "schemaVersion": 1,
+  "id": "diegoalveslv.pinote",
+  "name": "Pinote",
+  "version": "0.1.0",
+  "author": "Diego Alves da Silva",
+  "description": "Plain-text notes in the Omarchy bar",
+  "kinds": [
+    "panel",
+    "bar-widget"
+  ],
+  "keepLoaded": true,
+  "entryPoints": {
+    "panel": "Panel.qml",
+    "barWidget": "BarWidget.qml"
+  },
+  "barWidget": {
+    "displayName": "Pinote",
+    "description": "Open the Pinote notes panel",
+    "category": "Productivity",
+    "allowMultiple": false,
+    "defaultSection": "right"
+  }
+}

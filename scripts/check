@@ -1,0 +1,56 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+ROOT=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
+OMARCHY_SHELL_ROOT=${OMARCHY_SHELL_ROOT:-/usr/share/omarchy/shell}
+QML_IMPORT_MIRROR=""
+
+cleanup() {
+  [[ -z $QML_IMPORT_MIRROR ]] || rm -rf -- "$QML_IMPORT_MIRROR"
+}
+
+trap cleanup EXIT
+
+fail() {
+  printf 'pinote check: %s\n' "$*" >&2
+  exit 1
+}
+
+command -v omarchy >/dev/null 2>&1 ||
+  fail "omarchy is required; install Omarchy 4.0.2 or newer"
+
+command -v node >/dev/null 2>&1 ||
+  fail "node is required for development checks"
+
+if command -v qmllint >/dev/null 2>&1; then
+  QMLLINT=$(command -v qmllint)
+elif [[ -x /usr/lib/qt6/bin/qmllint ]]; then
+  QMLLINT=/usr/lib/qt6/bin/qmllint
+else
+  fail "qmllint was not found in PATH or at /usr/lib/qt6/bin/qmllint; install Qt 6 declarative tools"
+fi
+
+[[ -d $OMARCHY_SHELL_ROOT/Commons && -d $OMARCHY_SHELL_ROOT/Ui ]] ||
+  fail "Omarchy QML imports were not found under $OMARCHY_SHELL_ROOT; set OMARCHY_SHELL_ROOT to the shell QML root"
+
+# Quickshell maps the `qs` URI to its configuration root at runtime. Mirror
+# that namespace so standalone qmllint resolves the same modules.
+QML_IMPORT_MIRROR=$(mktemp -d)
+mkdir -p "$QML_IMPORT_MIRROR/qs"
+cp -R "$OMARCHY_SHELL_ROOT/Commons" "$QML_IMPORT_MIRROR/qs/Commons"
+cp -R "$OMARCHY_SHELL_ROOT/Ui" "$QML_IMPORT_MIRROR/qs/Ui"
+
+printf 'Validating manifest...\n'
+omarchy plugin validate "$ROOT"
+
+printf 'Testing JavaScript model...\n'
+node --test "$ROOT/tests"/*.test.js
+
+printf 'Linting QML...\n'
+"$QMLLINT" -W 0 -I "$QML_IMPORT_MIRROR" \
+  "$ROOT/NotesModel.js" \
+  "$ROOT/BarWidget.qml" \
+  "$ROOT/Panel.qml"
+
+printf 'Pinote checks passed.\n'
