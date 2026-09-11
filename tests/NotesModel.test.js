@@ -210,6 +210,11 @@ test("UTF-8 byte counting handles ASCII, multibyte text, and surrogate pairs", (
   assert.equal(Model.utf8ByteLength("a😀é"), Buffer.byteLength("a😀é", "utf8"))
 })
 
+test("JSON string byte counting matches serialization without allocating a quoted copy", () => {
+  for (const value of ["plain", 'quote"slash\\', "line\nfeed", "café", "😀", "\ud800"])
+    assert.equal(Model.jsonStringByteLength(value), Buffer.byteLength(JSON.stringify(value), "utf8"))
+})
+
 test("create is immutable and assigns stable creation and update timestamps", () => {
   const originalNote = note()
   const original = { version: 1, notes: [originalNote] }
@@ -321,6 +326,34 @@ test("mutations reject a snapshot whose UTF-8 serialization exceeds 10 MiB", () 
   assert.equal(result.ok, false)
   assert.deepEqual(issueCodes(result), ["file-too-large"])
   assert.equal(collection.notes.length, 163)
+})
+
+test("the total file-size limit takes precedence over the content limit", () => {
+  const content = "😀".repeat(3_000_000)
+  const result = Model.createNote(Model.emptyCollection(), content, CREATED, () => "oversized")
+
+  assert.equal(result.ok, false)
+  assert.deepEqual(issueCodes(result), ["file-too-large"])
+})
+
+test("persisted file-size issues precede record-level limit issues", () => {
+  const content = "😀".repeat(3_000_000)
+  const result = Model.parse(document([note({ content })]))
+
+  assert.equal(result.status, "recoverable")
+  assert.equal(issueCodes(result)[0], "file-too-large")
+  assert.ok(issueCodes(result).includes("content-too-long"))
+})
+
+test("every successful mutation serializes to a ready collection", () => {
+  const created = Model.createNote(Model.emptyCollection(), "Created", CREATED, () => "round-trip")
+  assert.equal(Model.parse(Model.serializeCollection(created.collection)).status, "ready")
+
+  const updated = Model.updateNote(created.collection, "round-trip", "Updated", UPDATED)
+  assert.equal(Model.parse(Model.serializeCollection(updated.collection)).status, "ready")
+
+  const deleted = Model.deleteNote(updated.collection, "round-trip")
+  assert.equal(Model.parse(Model.serializeCollection(deleted.collection)).status, "ready")
 })
 
 test("an oversized canonical persisted snapshot enters recovery", () => {

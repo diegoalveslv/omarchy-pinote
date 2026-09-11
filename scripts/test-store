@@ -1,0 +1,202 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+ROOT=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
+TMP_ROOT=$(mktemp -d "${TMPDIR:-/tmp}/pinote-store-test.XXXXXX")
+CONFIG_ROOT="$TMP_ROOT/config"
+STATE_ROOT="$TMP_ROOT/state"
+ERROR_STATE_ROOT="$TMP_ROOT/error-state"
+RETRY_STATE_ROOT="$TMP_ROOT/retry-state"
+SHUTDOWN_STATE_ROOT="$TMP_ROOT/shutdown-state"
+EXTERNAL_STATE_ROOT="$TMP_ROOT/external-state"
+PERMISSION_STATE_ROOT="$TMP_ROOT/permission-state"
+BACKUP_STATE_ROOT="$TMP_ROOT/backup-state"
+DIRTY_STATE_ROOT="$TMP_ROOT/dirty-state"
+MISMATCH_STATE_ROOT="$TMP_ROOT/mismatch-state"
+
+cleanup() {
+  rm -rf -- "$TMP_ROOT"
+}
+
+trap cleanup EXIT
+
+command -v qs >/dev/null 2>&1 || {
+  printf 'pinote store test: qs is required\n' >&2
+  exit 1
+}
+command -v timeout >/dev/null 2>&1 || {
+  printf 'pinote store test: timeout is required\n' >&2
+  exit 1
+}
+
+mkdir -p "$CONFIG_ROOT" "$STATE_ROOT" "$ERROR_STATE_ROOT/pinote/notes.json" \
+  "$RETRY_STATE_ROOT" "$SHUTDOWN_STATE_ROOT"
+mkdir -p "$EXTERNAL_STATE_ROOT"
+mkdir -p "$PERMISSION_STATE_ROOT" "$BACKUP_STATE_ROOT" "$DIRTY_STATE_ROOT" "$MISMATCH_STATE_ROOT"
+mkdir -p "$PERMISSION_STATE_ROOT/pinote"
+node -e 'require("node:fs").writeFileSync(process.argv[1], "{\"version\":1,\"notes\":[]}\n")' \
+  "$PERMISSION_STATE_ROOT/pinote/notes.json"
+chmod 000 "$PERMISSION_STATE_ROOT/pinote/notes.json"
+cp "$ROOT/NotesModel.js" "$ROOT/NotesStoreQueue.js" "$ROOT/NotesStore.qml" "$CONFIG_ROOT/"
+cp "$ROOT/tests/StoreSmoke.qml" "$CONFIG_ROOT/"
+
+set +e
+OUTPUT=$(QT_LOGGING_RULES="qt.qpa.services=false" XDG_STATE_HOME="$STATE_ROOT" \
+  timeout 10s qs --no-color -p "$CONFIG_ROOT/StoreSmoke.qml" 2>&1)
+STATUS=$?
+set -e
+printf '%s\n' "$OUTPUT"
+
+if [[ $STATUS -ne 0 || $OUTPUT != *PINOTE_STORE_SMOKE_OK* ]]; then
+  printf 'pinote store test: Quickshell smoke test failed\n' >&2
+  exit 1
+fi
+
+set +e
+OUTPUT=$(QT_LOGGING_RULES="qt.qpa.services=false" XDG_STATE_HOME="$STATE_ROOT" \
+  PINOTE_STORE_SMOKE_MODE=reload timeout 10s qs --no-color -p "$CONFIG_ROOT/StoreSmoke.qml" 2>&1)
+STATUS=$?
+set -e
+printf '%s\n' "$OUTPUT"
+
+if [[ $STATUS -ne 0 || $OUTPUT != *PINOTE_STORE_RELOAD_OK* ]]; then
+  printf 'pinote store test: restart load test failed\n' >&2
+  exit 1
+fi
+
+set +e
+OUTPUT=$(QT_LOGGING_RULES="qt.qpa.services=false" XDG_STATE_HOME="$ERROR_STATE_ROOT" \
+  PINOTE_STORE_SMOKE_MODE=expect-load-error timeout 10s qs --no-color -p "$CONFIG_ROOT/StoreSmoke.qml" 2>&1)
+STATUS=$?
+set -e
+printf '%s\n' "$OUTPUT"
+
+if [[ $STATUS -ne 0 || $OUTPUT != *PINOTE_STORE_LOAD_ERROR_OK* ]]; then
+  printf 'pinote store test: path-type load test failed\n' >&2
+  exit 1
+fi
+
+set +e
+OUTPUT=$(QT_LOGGING_RULES="qt.qpa.services=false" XDG_STATE_HOME="$RETRY_STATE_ROOT" \
+  PINOTE_STORE_SMOKE_MODE=save-retry timeout 10s qs --no-color -p "$CONFIG_ROOT/StoreSmoke.qml" 2>&1)
+STATUS=$?
+set -e
+printf '%s\n' "$OUTPUT"
+
+if [[ $STATUS -ne 0 || $OUTPUT != *PINOTE_STORE_RETRY_OK* ]]; then
+  printf 'pinote store test: failed-save retry test failed\n' >&2
+  exit 1
+fi
+
+set +e
+OUTPUT=$(QT_LOGGING_RULES="qt.qpa.services=false" XDG_STATE_HOME="$SHUTDOWN_STATE_ROOT" \
+  PINOTE_STORE_SMOKE_MODE=shutdown timeout 10s qs --no-color -p "$CONFIG_ROOT/StoreSmoke.qml" 2>&1)
+STATUS=$?
+set -e
+printf '%s\n' "$OUTPUT"
+
+if [[ $STATUS -ne 0 || $OUTPUT != *PINOTE_STORE_SHUTDOWN_STARTED* ]]; then
+  printf 'pinote store test: shutdown flush test failed\n' >&2
+  exit 1
+fi
+
+set +e
+OUTPUT=$(QT_LOGGING_RULES="qt.qpa.services=false" XDG_STATE_HOME="$EXTERNAL_STATE_ROOT" \
+  PINOTE_STORE_SMOKE_MODE=external timeout 10s qs --no-color -p "$CONFIG_ROOT/StoreSmoke.qml" 2>&1)
+STATUS=$?
+set -e
+printf '%s\n' "$OUTPUT"
+
+if [[ $STATUS -ne 0 || $OUTPUT != *PINOTE_STORE_EXTERNAL_OK* ]]; then
+  printf 'pinote store test: external-change watcher test failed\n' >&2
+  exit 1
+fi
+
+set +e
+OUTPUT=$(QT_LOGGING_RULES="qt.qpa.services=false" XDG_STATE_HOME="$PERMISSION_STATE_ROOT" \
+  PINOTE_STORE_SMOKE_MODE=expect-permission-load timeout 10s qs --no-color -p "$CONFIG_ROOT/StoreSmoke.qml" 2>&1)
+STATUS=$?
+set -e
+chmod 600 "$PERMISSION_STATE_ROOT/pinote/notes.json"
+printf '%s\n' "$OUTPUT"
+
+if [[ $STATUS -ne 0 || $OUTPUT != *PINOTE_STORE_PERMISSION_OK* ]]; then
+  printf 'pinote store test: permission-denial test failed\n' >&2
+  exit 1
+fi
+
+set +e
+OUTPUT=$(QT_LOGGING_RULES="qt.qpa.services=false" XDG_STATE_HOME="$BACKUP_STATE_ROOT" \
+  PINOTE_STORE_SMOKE_MODE=backup-retry timeout 10s qs --no-color -p "$CONFIG_ROOT/StoreSmoke.qml" 2>&1)
+STATUS=$?
+set -e
+printf '%s\n' "$OUTPUT"
+
+if [[ $STATUS -ne 0 || $OUTPUT != *PINOTE_STORE_BACKUP_RETRY_OK* ]]; then
+  printf 'pinote store test: backup retry test failed\n' >&2
+  exit 1
+fi
+
+set +e
+OUTPUT=$(QT_LOGGING_RULES="qt.qpa.services=false" XDG_STATE_HOME="$DIRTY_STATE_ROOT" \
+  PINOTE_STORE_SMOKE_MODE=dirty-external timeout 10s qs --no-color -p "$CONFIG_ROOT/StoreSmoke.qml" 2>&1)
+STATUS=$?
+set -e
+printf '%s\n' "$OUTPUT"
+
+if [[ $STATUS -ne 0 || $OUTPUT != *PINOTE_STORE_DIRTY_EXTERNAL_OK* ]]; then
+  printf 'pinote store test: dirty external-change test failed\n' >&2
+  exit 1
+fi
+
+set +e
+OUTPUT=$(QT_LOGGING_RULES="qt.qpa.services=false" XDG_STATE_HOME="$MISMATCH_STATE_ROOT" \
+  PINOTE_STORE_SMOKE_MODE=verify-mismatch timeout 10s qs --no-color -p "$CONFIG_ROOT/StoreSmoke.qml" 2>&1)
+STATUS=$?
+set -e
+printf '%s\n' "$OUTPUT"
+
+if [[ $STATUS -ne 0 || $OUTPUT != *PINOTE_STORE_VERIFY_MISMATCH_OK* ]]; then
+  printf 'pinote store test: primary verification mismatch test failed\n' >&2
+  exit 1
+fi
+
+node - "$STATE_ROOT/pinote/notes.json" "$STATE_ROOT/pinote/notes.json.bak" \
+  "$RETRY_STATE_ROOT/pinote/notes.json" "$RETRY_STATE_ROOT/pinote/notes.json.bak" \
+  "$SHUTDOWN_STATE_ROOT/pinote/notes.json" \
+  "$BACKUP_STATE_ROOT/pinote/notes.json" "$BACKUP_STATE_ROOT/pinote/notes.json.bak" \
+  "$DIRTY_STATE_ROOT/pinote/notes.json" "$MISMATCH_STATE_ROOT/pinote/notes.json" <<'NODE'
+const fs = require("node:fs")
+const assert = require("node:assert/strict")
+
+const primary = fs.readFileSync(process.argv[2], "utf8")
+const backup = fs.readFileSync(process.argv[3], "utf8")
+assert.equal(backup, primary)
+assert.ok(primary.endsWith("\n"))
+
+const parsed = JSON.parse(primary)
+assert.equal(parsed.version, 1)
+assert.equal(parsed.notes.length, 1)
+assert.equal(parsed.notes[0].content, "Updated note\nwith two lines")
+
+const retryPrimary = fs.readFileSync(process.argv[4], "utf8")
+const retryBackup = fs.readFileSync(process.argv[5], "utf8")
+assert.equal(retryBackup, retryPrimary)
+assert.equal(JSON.parse(retryPrimary).notes[0].content, "Recovered save")
+
+const shutdownPrimary = fs.readFileSync(process.argv[6], "utf8")
+assert.equal(JSON.parse(shutdownPrimary).notes.length, 1)
+assert.equal(JSON.parse(shutdownPrimary).notes[0].content, "Latest shutdown snapshot")
+
+const backupPrimary = fs.readFileSync(process.argv[7], "utf8")
+assert.equal(fs.readFileSync(process.argv[8], "utf8"), backupPrimary)
+assert.equal(JSON.parse(backupPrimary).notes[0].content, "Backup retry")
+
+assert.equal(JSON.parse(fs.readFileSync(process.argv[9], "utf8")).notes[0].content,
+  "Preserved external note")
+assert.equal(JSON.parse(fs.readFileSync(process.argv[10], "utf8")).notes[0].content,
+  "Verification mismatch")
+NODE
+
+printf 'Pinote store smoke test passed.\n'

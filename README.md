@@ -1,8 +1,9 @@
 # Pinote
 
 Pinote is an Omarchy Shell plugin for keeping plain-text notes close at hand.
-The current implementation is the initial shell skeleton: it provides a bar
-widget and a centered panel with the standard shell lifecycle.
+The current implementation provides a bar widget, a centered panel shell, and
+an atomic persistent store. The notes-list and editor controls are still under
+development.
 
 ## Requirements
 
@@ -46,6 +47,13 @@ omarchy-shell shell toggle diegoalveslv.pinote '{}'
 The suggested keyboard shortcut is `SUPER ALT + N`. Shortcut configuration
 will be documented with the completed notes workflow.
 
+## Storage
+
+Pinote stores committed notes in `$XDG_STATE_HOME/pinote/notes.json`, falling
+back to `~/.local/state/pinote/notes.json`. Confirmed snapshots are also copied
+atomically to `notes.json.bak`. Hiding the panel, restarting Omarchy Shell, or
+updating the plugin does not remove these files.
+
 ## Checks
 
 Run all repository checks through one command:
@@ -54,10 +62,11 @@ Run all repository checks through one command:
 scripts/check
 ```
 
-The script validates `manifest.json`, runs the pure JavaScript model tests with
-Node's built-in test runner, and runs `qmllint`. It finds `qmllint` through
-`PATH` first and uses `/usr/lib/qt6/bin/qmllint` as the Arch Linux fallback.
-Set `OMARCHY_SHELL_ROOT` only when the Omarchy Shell QML modules are installed
+The script validates `manifest.json`, runs the pure JavaScript tests with
+Node's built-in test runner, runs `qmllint`, and exercises the persistent store
+with disposable state through Quickshell. It finds `qmllint` through `PATH`
+first and uses `/usr/lib/qt6/bin/qmllint` as the Arch Linux fallback. Set
+`OMARCHY_SHELL_ROOT` only when the Omarchy Shell QML modules are installed
 somewhere other than `/usr/share/omarchy/shell`.
 
 ## License

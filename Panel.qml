@@ -12,6 +12,10 @@ Item {
   property bool opened: false
   property var shell: null
 
+  NotesStore {
+    id: notesStore
+  }
+
   function popupColor(name) {
     return Color.popups[name]
   }

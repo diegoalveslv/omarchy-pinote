@@ -50,7 +50,12 @@ node --test "$ROOT/tests"/*.test.js
 printf 'Linting QML...\n'
 "$QMLLINT" -W 0 -I "$QML_IMPORT_MIRROR" \
   "$ROOT/NotesModel.js" \
+  "$ROOT/NotesStoreQueue.js" \
   "$ROOT/BarWidget.qml" \
+  "$ROOT/NotesStore.qml" \
   "$ROOT/Panel.qml"
+
+printf 'Testing persistent store...\n'
+"$ROOT/scripts/test-store"
 
 printf 'Pinote checks passed.\n'

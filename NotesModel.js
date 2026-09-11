@@ -77,6 +77,39 @@ function utf8ByteLength(value) {
   return bytes
 }
 
+function jsonStringByteLength(value) {
+  var text = String(value)
+  var bytes = 2
+
+  for (var i = 0; i < text.length; i++) {
+    var unit = text.charCodeAt(i)
+    if (unit === 0x22 || unit === 0x5c || unit === 0x08 || unit === 0x09
+        || unit === 0x0a || unit === 0x0c || unit === 0x0d) {
+      bytes += 2
+    } else if (unit <= 0x1f) {
+      bytes += 6
+    } else if (unit <= 0x7f) {
+      bytes++
+    } else if (unit <= 0x7ff) {
+      bytes += 2
+    } else if (unit >= 0xd800 && unit <= 0xdbff && i + 1 < text.length) {
+      var next = text.charCodeAt(i + 1)
+      if (next >= 0xdc00 && next <= 0xdfff) {
+        bytes += 4
+        i++
+      } else {
+        bytes += 6
+      }
+    } else if (unit >= 0xd800 && unit <= 0xdfff) {
+      bytes += 6
+    } else {
+      bytes += 3
+    }
+  }
+
+  return bytes
+}
+
 function isCanonicalTimestamp(value) {
   if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(value)) return false
   var milliseconds = Date.parse(value)
@@ -127,6 +160,7 @@ function parse(raw) {
     return recoverable(emptyCollection(), [issue("invalid-notes", "notes", "The notes field must be an array.")])
 
   var notes = []
+  var sizeNotes = []
   var issues = []
   var seenIds = Object.create(null)
   var acceptedIds = Object.create(null)
@@ -140,6 +174,8 @@ function parse(raw) {
       issues.push(issue("invalid-record", path, "Each note must be an object."))
       continue
     }
+
+    sizeNotes.push(canonicalNote(value))
 
     if (typeof value.id !== "string" || value.id.length === 0) {
       issues.push(issue("invalid-id", path + ".id", "A note ID must be a non-empty string."))
@@ -173,8 +209,8 @@ function parse(raw) {
   var collection = { version: SCHEMA_VERSION, notes: notes }
   if (data.notes.length > MAX_NOTES)
     issues.push(issue("too-many-notes", "notes", "The notes collection exceeds the note limit."))
-  if (utf8ByteLength(serializeCollection(collection)) > MAX_CANONICAL_BYTES)
-    issues.push(issue("file-too-large", "$", "The canonical notes file exceeds the size limit."))
+  if (utf8ByteLength(serializeCollection({ version: SCHEMA_VERSION, notes: sizeNotes })) > MAX_CANONICAL_BYTES)
+    issues.unshift(issue("file-too-large", "$", "The canonical notes file exceeds the size limit."))
 
   return issues.length > 0 ? recoverable(collection, issues) : ready(collection)
 }
@@ -222,16 +258,24 @@ function validateSnapshotSize(collection) {
   return null
 }
 
+function prospectiveSnapshotByteLength(collection, note, index) {
+  var notes = collection && Array.isArray(collection.notes) ? collection.notes.slice() : []
+  var placeholder = canonicalNote(note)
+  placeholder.content = ""
+  if (index < 0) notes.push(placeholder)
+  else notes[index] = placeholder
+
+  return utf8ByteLength(serializeCollection({ version: SCHEMA_VERSION, notes: notes }))
+    - 2 + jsonStringByteLength(note.content)
+}
+
 function createNote(collection, content, timestamp, candidateGenerator) {
   var invalidContent = validateMutationContent(content)
-  if (invalidContent) return invalidContent
+  if (invalidContent && invalidContent.issues[0].code !== "content-too-long") return invalidContent
   var invalidTimestamp = validateMutationTimestamp(timestamp)
   if (invalidTimestamp) return invalidTimestamp
 
   var notes = collection && Array.isArray(collection.notes) ? collection.notes : []
-  if (notes.length >= MAX_NOTES)
-    return { ok: false, issues: [issue("too-many-notes", "notes", "The notes collection has reached its note limit.")] }
-
   var generated = generateUniqueId(collection, candidateGenerator)
   if (!generated.ok) return generated
 
@@ -239,8 +283,15 @@ function createNote(collection, content, timestamp, candidateGenerator) {
   var nextNotes = notes.slice()
   nextNotes.push(note)
   var nextCollection = { version: SCHEMA_VERSION, notes: nextNotes }
+  if (invalidContent) {
+    if (prospectiveSnapshotByteLength(collection, note, -1) > MAX_CANONICAL_BYTES)
+      return { ok: false, issues: [issue("file-too-large", "$", "The canonical notes file exceeds the size limit.")] }
+    return invalidContent
+  }
   var oversized = validateSnapshotSize(nextCollection)
   if (oversized) return oversized
+  if (notes.length >= MAX_NOTES)
+    return { ok: false, issues: [issue("too-many-notes", "notes", "The notes collection has reached its note limit.")] }
   return { ok: true, collection: nextCollection, note: note }
 }
 
@@ -249,7 +300,7 @@ function updateNote(collection, id, content, timestamp) {
   if (index === -1)
     return { ok: false, issues: [issue("note-not-found", "id", "The note does not exist.")] }
   var invalidContent = validateMutationContent(content)
-  if (invalidContent) return invalidContent
+  if (invalidContent && invalidContent.issues[0].code !== "content-too-long") return invalidContent
   var invalidTimestamp = validateMutationTimestamp(timestamp)
   if (invalidTimestamp) return invalidTimestamp
 
@@ -263,6 +314,11 @@ function updateNote(collection, id, content, timestamp) {
   var nextNotes = collection.notes.slice()
   nextNotes[index] = note
   var nextCollection = { version: SCHEMA_VERSION, notes: nextNotes }
+  if (invalidContent) {
+    if (prospectiveSnapshotByteLength(collection, note, index) > MAX_CANONICAL_BYTES)
+      return { ok: false, issues: [issue("file-too-large", "$", "The canonical notes file exceeds the size limit.")] }
+    return invalidContent
+  }
   var oversized = validateSnapshotSize(nextCollection)
   if (oversized) return oversized
   return { ok: true, collection: nextCollection, note: note }
@@ -307,6 +363,7 @@ if (typeof module !== "undefined") {
     persistenceStateForParseResult: persistenceStateForParseResult,
     unicodeLength: unicodeLength,
     utf8ByteLength: utf8ByteLength,
+    jsonStringByteLength: jsonStringByteLength,
     isCanonicalTimestamp: isCanonicalTimestamp,
     serializeCollection: serializeCollection,
     parse: parse,
