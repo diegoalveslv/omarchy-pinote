@@ -31,6 +31,14 @@ else
   fail "qmllint was not found in PATH or at /usr/lib/qt6/bin/qmllint; install Qt 6 declarative tools"
 fi
 
+if command -v qmltestrunner >/dev/null 2>&1; then
+  QMLTESTRUNNER=$(command -v qmltestrunner)
+elif [[ -x /usr/lib/qt6/bin/qmltestrunner ]]; then
+  QMLTESTRUNNER=/usr/lib/qt6/bin/qmltestrunner
+else
+  fail "qmltestrunner was not found in PATH or at /usr/lib/qt6/bin/qmltestrunner; install qt6-declarative"
+fi
+
 [[ -d $OMARCHY_SHELL_ROOT/Commons && -d $OMARCHY_SHELL_ROOT/Ui ]] ||
   fail "Omarchy QML imports were not found under $OMARCHY_SHELL_ROOT; set OMARCHY_SHELL_ROOT to the shell QML root"
 
@@ -52,8 +60,14 @@ printf 'Linting QML...\n'
   "$ROOT/NotesModel.js" \
   "$ROOT/NotesStoreQueue.js" \
   "$ROOT/BarWidget.qml" \
+  "$ROOT/ModalKeyRouter.qml" \
+  "$ROOT/PanelState.qml" \
   "$ROOT/NotesStore.qml" \
   "$ROOT/Panel.qml"
+
+printf 'Testing QML interactions...\n'
+QT_QPA_PLATFORM=offscreen QT_QUICK_CONTROLS_STYLE=Basic \
+  "$QMLTESTRUNNER" -input "$ROOT/tests/qml" -import "$QML_IMPORT_MIRROR"
 
 printf 'Testing persistent store...\n'
 "$ROOT/scripts/test-store"
