@@ -2,3 +2,4 @@
 *.jsc
 *.log
 .qmllint.ini.user
+.opencode/
