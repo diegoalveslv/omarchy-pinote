@@ -8,12 +8,14 @@ import Quickshell.Hyprland
 import Quickshell.Wayland
 import qs.Commons
 import qs.Ui
+import "RuntimeIdentity.js" as RuntimeIdentity
 
 Item {
   id: root
 
   property bool opened: false
   property var shell: null
+  property var manifest: null
 
   property alias mode: panelState.mode
   property alias selectedNoteId: panelState.selectedNoteId
@@ -24,6 +26,7 @@ Item {
   property alias pendingDeleteId: panelState.pendingDeleteId
   property alias deleteConfirmOpen: panelState.deleteConfirmOpen
   property bool focusPrimed: false
+  readonly property var runtime: RuntimeIdentity.fromManifest(manifest)
 
   readonly property bool collectionVisible: notesStore.status === "ready"
     || notesStore.status === "saving"
@@ -34,6 +37,16 @@ Item {
 
   NotesStore {
     id: notesStore
+    stateDirectoryName: root.runtime.stateDirectoryName
+    logPrefix: root.runtime.logPrefix
+    displayName: root.runtime.displayName
+    autoStart: {
+      if (root.manifest === null) return false
+      var expected = RuntimeIdentity.fromManifest(root.manifest)
+      return stateDirectoryName === expected.stateDirectoryName
+        && logPrefix === expected.logPrefix
+        && displayName === expected.displayName
+    }
   }
 
   PanelState {
@@ -90,7 +103,7 @@ Item {
   }
 
   function requestClose() {
-    if (shell && typeof shell.hide === "function") shell.hide("diegoalveslv.pinote")
+    if (shell && typeof shell.hide === "function") shell.hide(runtime.pluginId)
     else close()
   }
 
@@ -182,7 +195,7 @@ Item {
     color: "transparent"
     exclusionMode: ExclusionMode.Ignore
 
-    WlrLayershell.namespace: "pinote"
+    WlrLayershell.namespace: root.runtime.layerNamespace
     WlrLayershell.layer: WlrLayer.Overlay
     WlrLayershell.keyboardFocus: root.opened
       ? (root.focusPrimed ? WlrKeyboardFocus.OnDemand : WlrKeyboardFocus.Exclusive)
@@ -271,7 +284,7 @@ Item {
               Layout.fillWidth: true
               text: root.editorVisible
                 ? (root.editingNoteId === "" ? "New note" : (root.editingNoteMissing ? "Restore note" : "Edit note"))
-                : "Pinote"
+                : root.runtime.displayName
               textFormat: Text.PlainText
               color: root.popupColor("text")
               font.family: root.fontToken("family")
@@ -311,7 +324,7 @@ Item {
                 ? "Saving changes..."
                 : notesStore.status === "save-error"
                   ? (notesStore.externalChangePending
-                    ? "The notes file changed externally, so Pinote will not overwrite it. Keep this panel open, restore the file to the version Pinote last loaded, then check again."
+                    ? "The notes file changed externally, so " + root.runtime.displayName + " will not overwrite it. Keep this panel open, restore the file to the version it last loaded, then check again."
                     : "Changes are not saved. Correct the storage problem and retry.")
                   : "The latest backup could not be updated."
               textFormat: Text.PlainText
@@ -354,7 +367,7 @@ Item {
               text: notesStore.status === "initializing" ? "Loading notes..."
                 : notesStore.status === "unsupported"
                   ? "This notes file uses unsupported schema version " + notesStore.unsupportedVersion + "."
-                  : "Pinote could not access its notes file."
+                  : root.runtime.displayName + " could not access its notes file."
               textFormat: Text.PlainText
               color: root.popupColor("text")
               horizontalAlignment: Text.AlignHCenter
@@ -367,7 +380,7 @@ Item {
               Layout.fillWidth: true
               visible: notesStore.status !== "initializing"
               text: notesStore.status === "unsupported"
-                ? "The file is read-only and will not be changed by this version of Pinote."
+                ? "The file is read-only and will not be changed by this version of " + root.runtime.displayName + "."
                 : (notesStore.errorMessage || "Check the state path and its permissions, then retry.")
               textFormat: Text.PlainText
               color: root.popupColor("text")

@@ -5,9 +5,11 @@ set -euo pipefail
 ROOT=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
 OMARCHY_SHELL_ROOT=${OMARCHY_SHELL_ROOT:-/usr/share/omarchy/shell}
 QML_IMPORT_MIRROR=""
+VALIDATION_ROOT=""
 
 cleanup() {
   [[ -z $QML_IMPORT_MIRROR ]] || rm -rf -- "$QML_IMPORT_MIRROR"
+  [[ -z $VALIDATION_ROOT ]] || rm -rf -- "$VALIDATION_ROOT"
 }
 
 trap cleanup EXIT
@@ -50,13 +52,27 @@ cp -R "$OMARCHY_SHELL_ROOT/Commons" "$QML_IMPORT_MIRROR/qs/Commons"
 cp -R "$OMARCHY_SHELL_ROOT/Ui" "$QML_IMPORT_MIRROR/qs/Ui"
 
 printf 'Validating manifest...\n'
-omarchy plugin validate "$ROOT"
+VALIDATION_ROOT=$(mktemp -d)
+runtime_files=(
+  manifest.json BarWidget.qml Panel.qml NotesStore.qml PanelState.qml
+  ModalKeyRouter.qml NotesModel.js NotesStoreQueue.js RuntimeIdentity.js
+)
+for file in "${runtime_files[@]}"; do cp -- "$ROOT/$file" "$VALIDATION_ROOT/$file"; done
+omarchy plugin validate "$VALIDATION_ROOT"
 
 printf 'Testing JavaScript model...\n'
 node --test "$ROOT/tests"/*.test.js
 
+printf 'Checking shell scripts...\n'
+for script in "$ROOT/scripts/check" "$ROOT/scripts/test-store" \
+  "$ROOT/scripts/live-check" "$ROOT/scripts/live-test"; do
+  [[ -x $script ]] || fail "$script must be executable"
+  bash -n "$script"
+done
+
 printf 'Linting QML...\n'
 "$QMLLINT" -W 0 -I "$QML_IMPORT_MIRROR" \
+  "$ROOT/RuntimeIdentity.js" \
   "$ROOT/NotesModel.js" \
   "$ROOT/NotesStoreQueue.js" \
   "$ROOT/BarWidget.qml" \

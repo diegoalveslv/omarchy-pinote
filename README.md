@@ -33,6 +33,36 @@ omarchy-shell shell rescanPlugins
 
 The development workflow never requires modifying `/usr/share/omarchy/`.
 
+### Isolated Live Testing
+
+Do not run destructive acceptance tests against an installed production copy
+of Pinote. Start with the read-only preflight:
+
+```bash
+scripts/live-check
+```
+
+Then create an ephemeral `Pinote (Live Test)` installation with the distinct
+ID `diegoalveslv.pinote.live-test` and state directory `pinote-live-test`:
+
+```bash
+scripts/live-test
+```
+
+The script stages the generated variant in a hidden directory on the plugin
+filesystem, validates it, and atomically renames it into place. It waits while
+the manual acceptance flow runs and removes its plugin and state on exit. For
+agent-driven testing, `scripts/live-test --yes-production-idle --keep` leaves
+the variant available temporarily; always finish with:
+
+```bash
+scripts/live-test --remove
+```
+
+Installing or removing any plugin reloads the entire Omarchy plugin registry.
+Confirm production Pinote is hidden, durable, and has no draft before starting.
+Prefer one manual click on the live-test bar icon to verify pointer routing.
+
 ## Usage
 
 Click the Pinote icon in the bar, or use shell IPC:

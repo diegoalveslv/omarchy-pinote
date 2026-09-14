@@ -1,0 +1,63 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+PRODUCTION_ID=diegoalveslv.pinote
+TEST_ID=diegoalveslv.pinote.live-test
+PLUGIN_ROOT=${PINOTE_LIVE_PLUGIN_ROOT:-$HOME/.config/omarchy/plugins}
+
+if [[ ${XDG_STATE_HOME:-} == /* ]]; then
+  STATE_ROOT=$XDG_STATE_HOME
+else
+  STATE_ROOT=$HOME/.local/state
+fi
+
+fail() {
+  printf 'pinote live-check: %s\n' "$*" >&2
+  exit 1
+}
+
+for tool in omarchy omarchy-shell hyprctl jq qs wtype grim; do
+  command -v "$tool" >/dev/null 2>&1 || fail "$tool is required"
+done
+
+shell_pid=$(pgrep -o -f 'quickshell.*omarchy/shell' || true)
+[[ -n $shell_pid ]] || fail "the Omarchy Shell process is not running"
+
+plugin_status() {
+  local id=$1
+  local path=$2
+  local discovered enabled
+  discovered=$(omarchy plugin list --json | jq -r --arg id "$id" 'any(.[]; .id == $id)')
+  enabled=$(omarchy plugin list --json | jq -r --arg id "$id" \
+    'first(.[] | select(.id == $id) | .enabled) // false')
+  printf '%s: path=%s discovered=%s enabled=%s\n' "$id" \
+    "$([[ -e $path ]] && printf present || printf absent)" "$discovered" "$enabled"
+}
+
+state_status() {
+  local name=$1
+  local path=$2
+  printf '%s state: %s\n' "$name" "$([[ -e $path ]] && printf present || printf absent)"
+}
+
+printf 'shell pid: %s\n' "$shell_pid"
+plugin_status "$PRODUCTION_ID" "$PLUGIN_ROOT/$PRODUCTION_ID"
+plugin_status "$TEST_ID" "$PLUGIN_ROOT/$TEST_ID"
+state_status production "$STATE_ROOT/pinote"
+state_status live-test "$STATE_ROOT/pinote-live-test"
+
+printf 'outputs:\n'
+hyprctl monitors -j | jq -r '.[] | "  \(.name): position=\(.x),\(.y) size=\(.width)x\(.height) scale=\(.scale) transform=\(.transform) focused=\(.focused)"'
+
+if [[ -w /dev/uinput ]] && python -c 'import evdev' >/dev/null 2>&1; then
+  printf 'pointer fallback: available (/dev/uinput + Python evdev)\n'
+else
+  printf 'pointer fallback: unavailable; ask the user to click the test bar icon\n'
+fi
+
+if hyprctl monitors -j | jq -e 'any(.[]; .focused and .transform != 0)' >/dev/null; then
+  printf 'pointer automation: prohibited on the focused transformed output\n'
+else
+  printf 'pointer automation: focused output transform is 0; target verification is still required\n'
+fi

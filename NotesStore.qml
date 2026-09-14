@@ -9,6 +9,10 @@ Item {
 
   signal primaryVerificationPending
 
+  property string stateDirectoryName: "pinote"
+  property string logPrefix: "pinote:"
+  property string displayName: "Pinote"
+  property bool autoStart: true
   property string status: "initializing"
   property var collection: NotesModel.emptyCollection()
   readonly property var notes: NotesModel.newestFirst(collection)
@@ -35,7 +39,7 @@ Item {
   property bool externalChangePending: false
 
   readonly property string stateRoot: resolvedStateRoot()
-  readonly property string stateDirectory: stateRoot === "" ? "" : stateRoot + "/pinote"
+  readonly property string stateDirectory: stateRoot === "" ? "" : stateRoot + "/" + stateDirectoryName
   readonly property string primaryPath: stateDirectory === "" ? "" : stateDirectory + "/notes.json"
   readonly property string backupPath: stateDirectory === "" ? "" : stateDirectory + "/notes.json.bak"
 
@@ -55,6 +59,7 @@ Item {
   property var _verificationSnapshot: null
   property var _backupVerificationSnapshot: null
   property bool _directoryProcessStarted: false
+  property bool _initialized: false
   property bool _primaryDispatched: false
   property bool _destroying: false
 
@@ -164,7 +169,7 @@ Item {
     if (purpose === "conflict" || purpose === "retry-check") {
       externalChangePending = true
       _watchRequested = false
-      console.warn("pinote: dirty-state check failed: " + fileErrorCode(error) + " path=" + primaryPath)
+      console.warn(logPrefix + " dirty-state check failed: " + fileErrorCode(error) + " path=" + primaryPath)
       return
     }
     if (_readRevision !== revision || hasPendingSave) {
@@ -175,7 +180,7 @@ Item {
     }
     setFileError("load", primaryPath, error)
     status = "load-error"
-    console.warn("pinote: load failed: " + errorCode + " path=" + primaryPath)
+    console.warn(logPrefix + " load failed: " + errorCode + " path=" + primaryPath)
   }
 
   function applyParsed(result, raw, purpose) {
@@ -351,16 +356,32 @@ Item {
     return beginRead("retry")
   }
 
+  function initialize() {
+    if (_initialized || !autoStart) return
+    _initialized = true
+    if (stateRoot === "") {
+      errorOperation = "resolve-state-directory"
+      errorCode = "invalid-state-directory"
+      errorMessage = "Neither XDG_STATE_HOME nor HOME resolves to an absolute path."
+      status = "load-error"
+      console.warn(logPrefix + " state directory could not be resolved")
+    } else {
+      console.log(logPrefix + " initializing state path=" + stateDirectory)
+      ensureDirectory.command = ["mkdir", "-p", "--", stateDirectory]
+      ensureDirectory.running = true
+    }
+  }
+
   function finishDirectoryProbe(error) {
     if (error !== FileViewError.NotAFile) {
       errorOperation = "create-directory"
       errorCode = error === FileViewError.FileNotFound ? "directory-create-failed" : fileErrorCode(error)
       errorMessage = error === FileViewError.FileNotFound
-        ? "The Pinote state directory could not be created."
+        ? "The " + displayName + " state directory could not be created."
         : String(FileViewError.toString(error))
       errorPath = stateDirectory
       status = "load-error"
-      console.warn("pinote: state directory unavailable: " + errorCode + " path=" + stateDirectory)
+      console.warn(logPrefix + " state directory unavailable: " + errorCode + " path=" + stateDirectory)
       return
     }
 
@@ -371,10 +392,10 @@ Item {
   function rejectNonDirectoryStatePath() {
     errorOperation = "create-directory"
     errorCode = "not-a-directory"
-    errorMessage = "The Pinote state directory path is not a directory."
+    errorMessage = "The " + displayName + " state directory path is not a directory."
     errorPath = stateDirectory
     status = "load-error"
-    console.warn("pinote: state path is not a directory: path=" + stateDirectory)
+    console.warn(logPrefix + " state path is not a directory: path=" + stateDirectory)
   }
 
   function verifyPrimaryWrite() {
@@ -427,7 +448,7 @@ Item {
     errorPath = primaryPath
     status = "save-error"
     if (_watchRequested) externalChangePending = true
-    console.warn("pinote: save failed: " + errorCode + " path=" + primaryPath)
+    console.warn(logPrefix + " save failed: " + errorCode + " path=" + primaryPath)
   }
 
   function handlePrimaryFailed(error) {
@@ -476,7 +497,7 @@ Item {
     backupErrorMessage = message
     applyQueueTransition(failed)
     backupStatus = _queueState.activeBackup ? "saving" : "error"
-    console.warn("pinote: backup save failed: " + backupErrorCode + " path=" + backupPath)
+    console.warn(logPrefix + " backup save failed: " + backupErrorCode + " path=" + backupPath)
   }
 
   function handleBackupFailed(error) {
@@ -486,7 +507,6 @@ Item {
   Process {
     id: ensureDirectory
     running: false
-    command: ["mkdir", "-p", "--", root.stateDirectory]
     onRunningChanged: {
       if (running) root._directoryProcessStarted = true
       else if (root._directoryProcessStarted) root._probePath = root.stateDirectory
@@ -614,18 +634,8 @@ Item {
     printErrors: false
   }
 
-  Component.onCompleted: {
-    if (stateRoot === "") {
-      errorOperation = "resolve-state-directory"
-      errorCode = "invalid-state-directory"
-      errorMessage = "Neither XDG_STATE_HOME nor HOME resolves to an absolute path."
-      status = "load-error"
-      console.warn("pinote: state directory could not be resolved")
-    } else {
-      console.log("pinote: initializing state path=" + stateDirectory)
-      ensureDirectory.running = true
-    }
-  }
+  onAutoStartChanged: initialize()
+  Component.onCompleted: initialize()
 
   Component.onDestruction: {
     _destroying = true
@@ -636,12 +646,12 @@ Item {
     if (_verificationSnapshot) primaryVerifier.waitForJob()
     var diskPayload = shutdownConflictReader.text()
     if (diskPayload !== _lastDiskPayload && diskPayload !== activePayload) {
-      console.warn("pinote: shutdown save skipped because the primary file changed externally: path=" + primaryPath)
+      console.warn(logPrefix + " shutdown save skipped because the primary file changed externally: path=" + primaryPath)
       return
     }
     shutdownWriter.setText(_latestCommittedSnapshot.payload)
     shutdownWriter.waitForJob()
     if (shutdownVerifier.text() !== _latestCommittedSnapshot.payload)
-      console.warn("pinote: shutdown save verification failed: path=" + primaryPath)
+      console.warn(logPrefix + " shutdown save verification failed: path=" + primaryPath)
   }
 }

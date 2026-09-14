@@ -1,0 +1,191 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+ROOT=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
+PRODUCTION_ID=diegoalveslv.pinote
+TEST_ID=diegoalveslv.pinote.live-test
+TEST_NAME='Pinote (Live Test)'
+PLUGIN_ROOT=${PINOTE_LIVE_PLUGIN_ROOT:-$HOME/.config/omarchy/plugins}
+TARGET=$PLUGIN_ROOT/$TEST_ID
+MARKER=$TARGET/.pinote-live-test.json
+KEEP=false
+REMOVE=false
+CONFIRMED=false
+INSTALLED_THIS_RUN=false
+STAGE_ROOT=""
+
+if [[ ${XDG_STATE_HOME:-} == /* ]]; then
+  STATE_ROOT=$XDG_STATE_HOME
+else
+  STATE_ROOT=$HOME/.local/state
+fi
+PRODUCTION_STATE=$STATE_ROOT/pinote
+TEST_STATE=$STATE_ROOT/pinote-live-test
+
+usage() {
+  cat <<'EOF'
+Usage: scripts/live-test [--keep] [--yes-production-idle]
+       scripts/live-test --remove
+
+Creates an isolated diegoalveslv.pinote.live-test installation. By default,
+the script waits for Enter after manual testing and then removes the generated
+plugin and state. Use --keep for agent-driven testing, then --remove afterward.
+EOF
+}
+
+fail() {
+  printf 'pinote live-test: %s\n' "$*" >&2
+  exit 1
+}
+
+state_fingerprint() {
+  local path=$1
+  if [[ ! -e $path ]]; then
+    printf 'absent'
+    return
+  fi
+  tar -cf - -C "$(dirname -- "$path")" "$(basename -- "$path")" | sha256sum | cut -d' ' -f1
+}
+
+plugin_known() {
+  omarchy plugin list --json | jq -e --arg id "$TEST_ID" 'any(.[]; .id == $id)' >/dev/null
+}
+
+wait_for_plugin() {
+  local expected=$1
+  local attempt
+  for attempt in {1..20}; do
+    if [[ $expected == present ]] && plugin_known; then return 0; fi
+    if [[ $expected == absent ]] && ! plugin_known; then return 0; fi
+    sleep 0.25
+  done
+  fail "test plugin did not become $expected after rescan"
+}
+
+verify_owned_target() {
+  [[ -d $TARGET && ! -L $TARGET ]] || fail "test installation is missing or is not a real directory: $TARGET"
+  [[ -f $MARKER ]] || fail "refusing cleanup without ownership marker: $MARKER"
+  [[ $(jq -r '.id // ""' "$TARGET/manifest.json") == "$TEST_ID" ]] ||
+    fail "refusing cleanup because the manifest ID is not $TEST_ID"
+  [[ $(jq -r '.id // ""' "$MARKER") == "$TEST_ID" ]] ||
+    fail "refusing cleanup because the ownership marker is invalid"
+}
+
+remove_test_installation() {
+  verify_owned_target
+  local production_before
+  production_before=$(jq -r '.productionStateFingerprint // ""' "$MARKER")
+
+  if plugin_known; then
+    omarchy-shell shell hide "$TEST_ID" >/dev/null 2>&1 || true
+    omarchy plugin disable "$TEST_ID" >/dev/null 2>&1 || true
+  fi
+
+  rm -rf -- "$TARGET"
+  [[ $TEST_STATE == "$STATE_ROOT/pinote-live-test" ]] || fail "unsafe test state path: $TEST_STATE"
+  rm -rf -- "$TEST_STATE"
+  omarchy-shell shell rescanPlugins
+  wait_for_plugin absent
+
+  local production_after
+  production_after=$(state_fingerprint "$PRODUCTION_STATE")
+  [[ -z $production_before || $production_before == "$production_after" ]] ||
+    fail "production state changed during the live-test lifecycle"
+  printf 'Removed isolated live-test plugin and state.\n'
+}
+
+cleanup() {
+  local status=$?
+  trap - EXIT INT TERM
+  if [[ -n $STAGE_ROOT && -d $STAGE_ROOT ]]; then rm -rf -- "$STAGE_ROOT"; fi
+  if [[ $INSTALLED_THIS_RUN == true && $KEEP == false && -d $TARGET ]]; then
+    remove_test_installation || status=$?
+  fi
+  exit "$status"
+}
+
+while (( $# > 0 )); do
+  case "$1" in
+    --keep) KEEP=true ;;
+    --remove) REMOVE=true ;;
+    --yes-production-idle) CONFIRMED=true ;;
+    -h|--help) usage; exit 0 ;;
+    *) fail "unknown option: $1" ;;
+  esac
+  shift
+done
+
+for tool in omarchy omarchy-shell jq tar sha256sum; do
+  command -v "$tool" >/dev/null 2>&1 || fail "$tool is required"
+done
+
+if [[ $REMOVE == true ]]; then
+  remove_test_installation
+  exit 0
+fi
+
+[[ ! -e $TARGET ]] || fail "test installation already exists; inspect it and run scripts/live-test --remove"
+[[ ! -e $TEST_STATE ]] || fail "test state already exists; remove it explicitly before starting: $TEST_STATE"
+
+if [[ $CONFIRMED == false ]]; then
+  [[ -t 0 ]] || fail "use --yes-production-idle only after confirming production Pinote has no draft or pending save"
+  printf 'Installing any plugin reloads all Omarchy plugins.\n'
+  printf 'Confirm production Pinote is hidden, durable, and has no draft [y/N]: '
+  read -r answer
+  [[ $answer == y || $answer == Y ]] || fail "production-idle confirmation declined"
+fi
+
+"$ROOT/scripts/check"
+mkdir -p -- "$PLUGIN_ROOT"
+
+STAGE_ROOT=$(mktemp -d "$PLUGIN_ROOT/.pinote-live-test-stage.XXXXXX")
+trap cleanup EXIT INT TERM
+STAGED=$STAGE_ROOT/$TEST_ID
+mkdir -- "$STAGED"
+
+runtime_files=(
+  manifest.json BarWidget.qml Panel.qml NotesStore.qml PanelState.qml
+  ModalKeyRouter.qml NotesModel.js NotesStoreQueue.js RuntimeIdentity.js
+)
+for file in "${runtime_files[@]}"; do cp -- "$ROOT/$file" "$STAGED/$file"; done
+
+jq --arg id "$TEST_ID" --arg name "$TEST_NAME" '
+  .id = $id
+  | .name = $name
+  | .description = "Isolated live-test build of Pinote"
+  | .barWidget.displayName = $name
+  | .barWidget.description = "Open the isolated Pinote live-test panel"
+' "$STAGED/manifest.json" > "$STAGED/manifest.json.tmp"
+mv -- "$STAGED/manifest.json.tmp" "$STAGED/manifest.json"
+
+production_fingerprint=$(state_fingerprint "$PRODUCTION_STATE")
+jq -n --arg id "$TEST_ID" --arg source "$ROOT" \
+  --arg commit "$(git -C "$ROOT" rev-parse HEAD 2>/dev/null || printf unknown)" \
+  --arg productionStateFingerprint "$production_fingerprint" \
+  '{id: $id, source: $source, commit: $commit, productionStateFingerprint: $productionStateFingerprint}' \
+  > "$STAGED/.pinote-live-test.json"
+
+omarchy plugin validate "$STAGED"
+mv -- "$STAGED" "$TARGET"
+rm -rf -- "$STAGE_ROOT"
+STAGE_ROOT=""
+INSTALLED_THIS_RUN=true
+
+omarchy-shell shell rescanPlugins
+wait_for_plugin present
+omarchy plugin enable "$TEST_ID" --section right
+
+printf 'Installed %s at %s\n' "$TEST_NAME" "$TARGET"
+printf 'Test state: %s\n' "$TEST_STATE"
+printf 'IPC: omarchy-shell shell toggle %s '\''{}'\''\n' "$TEST_ID"
+printf 'Click the %s bar icon once to verify real pointer routing.\n' "$TEST_NAME"
+
+if [[ $KEEP == true ]]; then
+  printf 'Kept for testing. Remove with: scripts/live-test --remove\n'
+  INSTALLED_THIS_RUN=false
+  exit 0
+fi
+
+printf 'Press Enter after completing the live acceptance flow; cleanup runs on exit.\n'
+read -r
