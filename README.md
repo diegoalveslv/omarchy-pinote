@@ -8,6 +8,8 @@ store.
 
 - Omarchy 4.0.2 or newer
 - Quickshell 0.3.1 or newer, as provided by Omarchy
+- Python 3 and the standard Linux `/proc` filesystem for the descriptor-safe
+  recovery filesystem helper
 - Qt 6 declarative tools for local checks (`qmllint` and `qmltestrunner`)
 - Node.js for development checks (tested with 26.7.0)
 
@@ -104,6 +106,48 @@ Pinote keeps that snapshot available and offers a retry. If the canonical file
 changes externally while a save is unresolved, Pinote refuses to overwrite it.
 Keep the panel open to retain the in-memory snapshot, restore `notes.json` to
 the version Pinote last loaded, and use **Check again**.
+
+Pinote keeps its state directory at mode `0700`. Recovery-created note files,
+staging files, transaction markers, and archives use mode `0600`. If recovery
+moves an existing primary aside, that original file retains its existing mode.
+
+### Recovery
+
+If `notes.json` is malformed or contains invalid records, Pinote blocks normal
+writes and shows any individually valid records as a read-only preview. Use
+**Retry** after repairing the file externally. If `notes.json.bak` is complete
+and valid, **Restore backup** can restore it. **Start fresh** creates an empty
+version-1 collection. Both replacement actions require confirmation and first
+copy the damaged primary into an independent timestamped
+`notes.json.recovery-*` file. Pinote
+then stages the replacement, moves the current primary into a private
+timestamped `notes.json.recovery-current-*/notes.json` archive, and installs
+the stage through atomic hard-link creation. Unsupported hard links or an
+existing primary fail safely instead of falling back to check-then-rename.
+Recovery verifies that note and transaction descriptors still match their
+expected state-directory names, rejects additional hard-link aliases, and
+preserves their final content and mode when aliases are raced against a
+permission update. An
+external primary appearing during that handoff is preserved rather than
+overwritten. A private transaction marker lets Pinote safely finish or abandon
+an interrupted handoff on its next start.
+
+After a replacement is installed and transaction cleanup succeeds, Pinote stays
+read-only and asks you to select **Check again**. Editing is enabled only after
+a fresh read of the canonical file, so recovery verification cannot expose a
+stale in-memory snapshot as writable.
+
+Starting fresh does not replace `notes.json.bak`; the previous backup remains
+available for manual recovery until a later successful note mutation updates
+it. A future schema version remains read-only and cannot be restored or reset
+from Pinote. Replace it externally with a compatible file and select
+**Check again**.
+
+For manual recovery, close or disable Pinote before changing files, preserve
+all `notes.json.recovery-*` files, inspect `notes.json` and `notes.json.bak`,
+then put one complete version-1 document at `notes.json`. Plugin updates and
+removal leave the entire state directory, including backups and recovery
+archives, untouched.
 
 ## Checks
 

@@ -14,6 +14,39 @@ PERMISSION_STATE_ROOT="$TMP_ROOT/permission-state"
 BACKUP_STATE_ROOT="$TMP_ROOT/backup-state"
 DIRTY_STATE_ROOT="$TMP_ROOT/dirty-state"
 MISMATCH_STATE_ROOT="$TMP_ROOT/mismatch-state"
+RECOVERY_RESTORE_ROOT="$TMP_ROOT/recovery-restore-state"
+RECOVERY_RESET_ROOT="$TMP_ROOT/recovery-reset-state"
+RECOVERY_MISSING_ROOT="$TMP_ROOT/recovery-missing-state"
+UNSUPPORTED_ROOT="$TMP_ROOT/unsupported-state"
+RECOVERY_INVALID_ROOT="$TMP_ROOT/recovery-invalid-state"
+RECOVERY_ARCHIVE_FAILURE_ROOT="$TMP_ROOT/recovery-archive-failure-state"
+RECOVERY_CONFLICT_ROOT="$TMP_ROOT/recovery-conflict-state"
+RECOVERY_WRITE_RETRY_ROOT="$TMP_ROOT/recovery-write-retry-state"
+RECOVERY_BLANK_BACKUP_ROOT="$TMP_ROOT/recovery-blank-backup-state"
+RECOVERY_WHITESPACE_BACKUP_ROOT="$TMP_ROOT/recovery-whitespace-backup-state"
+RECOVERY_REPEAT_ROOT="$TMP_ROOT/recovery-repeat-state"
+RECOVERY_HELPER_FAILURE_ROOT="$TMP_ROOT/recovery-helper-failure-state"
+INTERRUPTED_RECOVERY_ROOT="$TMP_ROOT/interrupted-recovery-state"
+RECOVERY_HANDOFF_RETRY_ROOT="$TMP_ROOT/recovery-handoff-retry-state"
+RECOVERY_SHUTDOWN_ROOT="$TMP_ROOT/recovery-shutdown-state"
+RECOVERY_BACKUP_CHANGE_ROOT="$TMP_ROOT/recovery-backup-change-state"
+RECOVERY_VERIFICATION_RACE_ROOT="$TMP_ROOT/recovery-verification-race-state"
+RECOVERY_MODE_ROOT="$TMP_ROOT/recovery-mode-state"
+RECOVERY_CLEANUP_RACE_ROOT="$RECOVERY_CONFLICT_ROOT"
+RECOVERY_INPLACE_ROOT="$TMP_ROOT/recovery-inplace-state"
+RECOVERY_IDENTICAL_FAILURE_ROOT="$TMP_ROOT/recovery-identical-failure-state"
+INTERRUPTED_INSTALLED_ROOT="$TMP_ROOT/interrupted-installed-state"
+INTERRUPTED_HELPER_FAILURE_ROOT="$TMP_ROOT/interrupted-helper-failure-state"
+INTERRUPTED_HELPER_EXIT_ROOT="$TMP_ROOT/interrupted-helper-exit-state"
+INTERRUPTED_HELPER_ZERO_ROOT="$TMP_ROOT/interrupted-helper-zero-state"
+INTERRUPTED_CLEANUP_FAILURE_ROOT="$TMP_ROOT/interrupted-cleanup-failure-state"
+RECOVERY_SYMLINK_PRIMARY_ROOT="$TMP_ROOT/recovery-symlink-primary-state"
+RECOVERY_SYMLINK_BACKUP_ROOT="$TMP_ROOT/recovery-symlink-backup-state"
+RECOVERY_HARDLINK_PRIMARY_ROOT="$TMP_ROOT/recovery-hardlink-primary-state"
+RECOVERY_IDENTICAL_POSTINSTALL_ROOT="$TMP_ROOT/recovery-identical-postinstall-state"
+FIFO_PRIMARY_STATE_ROOT="$TMP_ROOT/fifo-primary-state"
+FIFO_MARKER_STATE_ROOT="$TMP_ROOT/fifo-marker-state"
+FIFO_STAGE_STATE_ROOT="$TMP_ROOT/fifo-stage-state"
 
 cleanup() {
   rm -rf -- "$TMP_ROOT"
@@ -34,11 +67,231 @@ mkdir -p "$CONFIG_ROOT" "$STATE_ROOT" "$ERROR_STATE_ROOT/pinote/notes.json" \
   "$RETRY_STATE_ROOT" "$SHUTDOWN_STATE_ROOT"
 mkdir -p "$EXTERNAL_STATE_ROOT"
 mkdir -p "$PERMISSION_STATE_ROOT" "$BACKUP_STATE_ROOT" "$DIRTY_STATE_ROOT" "$MISMATCH_STATE_ROOT"
+mkdir -p "$RECOVERY_RESTORE_ROOT/pinote" "$RECOVERY_RESET_ROOT/pinote" \
+  "$RECOVERY_MISSING_ROOT/pinote" "$UNSUPPORTED_ROOT/pinote"
+mkdir -p "$RECOVERY_INVALID_ROOT/pinote" "$RECOVERY_ARCHIVE_FAILURE_ROOT/pinote"
+mkdir -p "$RECOVERY_CONFLICT_ROOT/pinote"
+mkdir -p "$RECOVERY_WRITE_RETRY_ROOT/pinote"
+mkdir -p "$RECOVERY_BLANK_BACKUP_ROOT/pinote" "$RECOVERY_WHITESPACE_BACKUP_ROOT/pinote"
+mkdir -p "$RECOVERY_REPEAT_ROOT/pinote" "$RECOVERY_HELPER_FAILURE_ROOT/pinote" \
+  "$INTERRUPTED_RECOVERY_ROOT/pinote"
+mkdir -p "$RECOVERY_HANDOFF_RETRY_ROOT/pinote" "$RECOVERY_SHUTDOWN_ROOT/pinote"
+mkdir -p "$RECOVERY_BACKUP_CHANGE_ROOT/pinote" "$RECOVERY_VERIFICATION_RACE_ROOT/pinote" \
+  "$RECOVERY_MODE_ROOT/pinote"
+mkdir -p "$RECOVERY_INPLACE_ROOT/pinote" "$INTERRUPTED_INSTALLED_ROOT/pinote" \
+  "$RECOVERY_SYMLINK_PRIMARY_ROOT/pinote" "$RECOVERY_SYMLINK_BACKUP_ROOT/pinote"
+mkdir -p "$RECOVERY_IDENTICAL_FAILURE_ROOT/pinote"
+mkdir -p "$INTERRUPTED_HELPER_FAILURE_ROOT/pinote" "$RECOVERY_HARDLINK_PRIMARY_ROOT/pinote"
+mkdir -p "$INTERRUPTED_HELPER_EXIT_ROOT/pinote" "$RECOVERY_IDENTICAL_POSTINSTALL_ROOT/pinote"
+mkdir -p "$INTERRUPTED_HELPER_ZERO_ROOT/pinote" "$INTERRUPTED_CLEANUP_FAILURE_ROOT/pinote"
+mkdir -p "$FIFO_PRIMARY_STATE_ROOT/pinote" "$FIFO_MARKER_STATE_ROOT/pinote" \
+  "$FIFO_STAGE_STATE_ROOT/pinote/notes.json.recovery-current-fifo"
 mkdir -p "$PERMISSION_STATE_ROOT/pinote"
 node -e 'require("node:fs").writeFileSync(process.argv[1], "{\"version\":1,\"notes\":[]}\n")' \
   "$PERMISSION_STATE_ROOT/pinote/notes.json"
 chmod 000 "$PERMISSION_STATE_ROOT/pinote/notes.json"
+node - "$RECOVERY_RESTORE_ROOT" "$RECOVERY_RESET_ROOT" "$RECOVERY_MISSING_ROOT" \
+  "$UNSUPPORTED_ROOT" "$RECOVERY_INVALID_ROOT" "$RECOVERY_ARCHIVE_FAILURE_ROOT" \
+  "$RECOVERY_CONFLICT_ROOT" "$RECOVERY_WRITE_RETRY_ROOT" \
+  "$RECOVERY_BLANK_BACKUP_ROOT" "$RECOVERY_WHITESPACE_BACKUP_ROOT" \
+  "$RECOVERY_REPEAT_ROOT" "$RECOVERY_HELPER_FAILURE_ROOT" "$INTERRUPTED_RECOVERY_ROOT" \
+  "$RECOVERY_BACKUP_CHANGE_ROOT" "$RECOVERY_VERIFICATION_RACE_ROOT" \
+  "$RECOVERY_MODE_ROOT" "$RECOVERY_INPLACE_ROOT" "$INTERRUPTED_INSTALLED_ROOT" \
+  "$RECOVERY_SYMLINK_PRIMARY_ROOT" "$RECOVERY_SYMLINK_BACKUP_ROOT" \
+  "$RECOVERY_IDENTICAL_FAILURE_ROOT" "$INTERRUPTED_HELPER_FAILURE_ROOT" \
+  "$INTERRUPTED_HELPER_EXIT_ROOT" "$RECOVERY_HARDLINK_PRIMARY_ROOT" \
+  "$RECOVERY_IDENTICAL_POSTINSTALL_ROOT" "$INTERRUPTED_HELPER_ZERO_ROOT" \
+  "$INTERRUPTED_CLEANUP_FAILURE_ROOT" <<'NODE'
+const fs = require("node:fs")
+const path = require("node:path")
+
+const [restoreRoot, resetRoot, missingRoot, unsupportedRoot, invalidRoot, archiveFailureRoot,
+  conflictRoot, writeRetryRoot, blankBackupRoot, whitespaceBackupRoot, repeatRoot,
+  helperFailureRoot, interruptedRoot, backupChangeRoot, verificationRaceRoot,
+  modeRoot, inplaceRoot, interruptedInstalledRoot, symlinkPrimaryRoot,
+  symlinkBackupRoot, identicalFailureRoot, interruptedHelperFailureRoot,
+  interruptedHelperExitRoot, hardlinkPrimaryRoot, identicalPostinstallRoot,
+  interruptedHelperZeroRoot, interruptedCleanupFailureRoot] = process.argv.slice(2)
+const valid = content => JSON.stringify({
+  version: 1,
+  notes: [{
+    id: "recovery-note",
+    content,
+    createdAt: "2026-09-10T12:00:00.000Z",
+    updatedAt: "2026-09-10T12:00:00.000Z"
+  }]
+}, null, 2) + "\n"
+const partial = JSON.stringify({
+  version: 1,
+  notes: [JSON.parse(valid("Preview note")).notes[0], {
+    id: "invalid-note",
+    content: "",
+    createdAt: "invalid",
+    updatedAt: "invalid"
+  }]
+}, null, 2) + "\n"
+
+fs.writeFileSync(path.join(restoreRoot, "pinote/notes.json"), partial)
+fs.writeFileSync(path.join(restoreRoot, "original-primary"), partial)
+fs.writeFileSync(path.join(restoreRoot, "pinote/notes.json.bak"), valid("Backup recovery note"))
+fs.writeFileSync(path.join(resetRoot, "pinote/notes.json"), "{PINOTE_PRIVATE_SENTINEL_8f92")
+fs.writeFileSync(path.join(resetRoot, "pinote/notes.json.bak"), valid("PINOTE_PRIVATE_SENTINEL_8f92"))
+fs.writeFileSync(path.join(missingRoot, "pinote/notes.json"), "{broken")
+fs.writeFileSync(path.join(unsupportedRoot, "pinote/notes.json"), '{"version":1.5,"unknown":"shape"}\n')
+fs.writeFileSync(path.join(invalidRoot, "pinote/notes.json"), "{broken-primary")
+fs.writeFileSync(path.join(invalidRoot, "pinote/notes.json.bak"), "{broken-backup")
+fs.writeFileSync(path.join(archiveFailureRoot, "pinote/notes.json"), "{archive-must-remain")
+fs.writeFileSync(path.join(conflictRoot, "pinote/notes.json"), "{conflict-original")
+fs.writeFileSync(path.join(conflictRoot, "pinote/notes.json.bak"), valid("Backup handoff note"))
+fs.writeFileSync(path.join(conflictRoot, "injected.json"), valid("External handoff note"))
+fs.writeFileSync(path.join(conflictRoot, "injected-cleanup.json"), valid("External cleanup note"))
+fs.writeFileSync(path.join(writeRetryRoot, "pinote/notes.json"), "{write-retry-original")
+fs.writeFileSync(path.join(writeRetryRoot, "pinote/notes.json.bak"), valid("Write retry backup"))
+fs.writeFileSync(path.join(blankBackupRoot, "pinote/notes.json"), "{blank-backup-primary")
+fs.writeFileSync(path.join(blankBackupRoot, "pinote/notes.json.bak"), "")
+fs.writeFileSync(path.join(whitespaceBackupRoot, "pinote/notes.json"), "{whitespace-backup-primary")
+fs.writeFileSync(path.join(whitespaceBackupRoot, "pinote/notes.json.bak"), " \n\t ")
+fs.writeFileSync(path.join(repeatRoot, "pinote/notes.json"), "{first-damaged-primary")
+fs.writeFileSync(path.join(helperFailureRoot, "pinote/notes.json"), "{helper-failure-primary")
+fs.writeFileSync(path.join(backupChangeRoot, "pinote/notes.json"), "{backup-change-primary")
+fs.writeFileSync(path.join(backupChangeRoot, "pinote/notes.json.bak"), valid("Original backup note"))
+fs.writeFileSync(path.join(verificationRaceRoot, "pinote/notes.json"), "{verification-race-primary")
+fs.writeFileSync(path.join(modeRoot, "pinote/notes.json"), "{mode-primary", { mode: 0o600 })
+fs.writeFileSync(path.join(modeRoot, "pinote/notes.json.bak"), valid("Mode backup"), { mode: 0o600 })
+fs.writeFileSync(path.join(inplaceRoot, "pinote/notes.json"), "{inplace-original")
+fs.writeFileSync(path.join(inplaceRoot, "injected.json"), valid("External in-place note"))
+fs.writeFileSync(path.join(identicalFailureRoot, "pinote/notes.json"), "{identical-original")
+fs.writeFileSync(path.join(identicalFailureRoot, "injected.json"),
+  JSON.stringify({ version: 1, notes: [] }, null, 2) + "\n")
+
+const interruptedDir = path.join(interruptedRoot, "pinote")
+const expectedArchive = path.join(interruptedDir, "notes.json.recovery-interrupted")
+const currentArchiveDir = path.join(interruptedDir, "notes.json.recovery-current-interrupted")
+const currentArchive = path.join(currentArchiveDir, "notes.json")
+const staged = path.join(interruptedDir, ".pinote-recovery-stage-interrupted")
+fs.mkdirSync(currentArchiveDir, { mode: 0o700 })
+fs.writeFileSync(expectedArchive, "{interrupted-original")
+fs.writeFileSync(currentArchive, "{interrupted-original")
+fs.writeFileSync(staged, valid("Interrupted replacement"))
+fs.writeFileSync(path.join(interruptedDir, "notes.json.bak"), valid("Changed restart backup"))
+fs.writeFileSync(path.join(interruptedDir, ".pinote-recovery-transaction.json"), JSON.stringify({
+  version: 1,
+  action: "restore",
+  expectedArchive,
+  currentArchive,
+  staged
+}, null, 2) + "\n")
+
+const installedDir = path.join(interruptedInstalledRoot, "pinote")
+const installedExpected = path.join(installedDir, "notes.json.recovery-installed")
+const installedCurrentDir = path.join(installedDir, "notes.json.recovery-current-installed")
+const installedCurrent = path.join(installedCurrentDir, "notes.json")
+const installedStage = path.join(installedDir, ".pinote-recovery-stage-installed")
+fs.mkdirSync(installedCurrentDir, { mode: 0o700 })
+fs.writeFileSync(installedExpected, "{installed-original")
+fs.writeFileSync(installedCurrent, "{installed-original")
+fs.writeFileSync(installedStage, valid("Interrupted replacement"))
+fs.linkSync(installedStage, path.join(installedDir, "notes.json"))
+fs.writeFileSync(path.join(installedDir, ".pinote-recovery-transaction.json"), JSON.stringify({
+  version: 1,
+  action: "restore",
+  expectedArchive: installedExpected,
+  currentArchive: installedCurrent,
+  staged: installedStage
+}, null, 2) + "\n")
+
+const interruptedHelperDir = path.join(interruptedHelperFailureRoot, "pinote")
+const helperExpected = path.join(interruptedHelperDir, "notes.json.recovery-helper-failure")
+const helperCurrentDir = path.join(interruptedHelperDir, "notes.json.recovery-current-helper-failure")
+const helperCurrent = path.join(helperCurrentDir, "notes.json")
+const helperStage = path.join(interruptedHelperDir, ".pinote-recovery-stage-helper-failure")
+fs.mkdirSync(helperCurrentDir, { mode: 0o700 })
+fs.writeFileSync(helperExpected, "{interrupted-helper-original")
+fs.writeFileSync(helperCurrent, "{interrupted-helper-original")
+fs.writeFileSync(helperStage, valid("Interrupted replacement"))
+fs.writeFileSync(path.join(interruptedHelperDir, ".pinote-recovery-transaction.json"), JSON.stringify({
+  version: 1,
+  action: "restore",
+  expectedArchive: helperExpected,
+  currentArchive: helperCurrent,
+  staged: helperStage
+}, null, 2) + "\n")
+
+const interruptedExitDir = path.join(interruptedHelperExitRoot, "pinote")
+const exitExpected = path.join(interruptedExitDir, "notes.json.recovery-helper-exit")
+const exitCurrentDir = path.join(interruptedExitDir, "notes.json.recovery-current-helper-exit")
+const exitCurrent = path.join(exitCurrentDir, "notes.json")
+const exitStage = path.join(interruptedExitDir, ".pinote-recovery-stage-helper-exit")
+fs.mkdirSync(exitCurrentDir, { mode: 0o700 })
+fs.writeFileSync(exitExpected, "{interrupted-exit-original")
+fs.writeFileSync(exitCurrent, "{interrupted-exit-original")
+fs.writeFileSync(exitStage, valid("Interrupted replacement"))
+fs.writeFileSync(path.join(interruptedExitDir, ".pinote-recovery-transaction.json"), JSON.stringify({
+  version: 1,
+  action: "restore",
+  expectedArchive: exitExpected,
+  currentArchive: exitCurrent,
+  staged: exitStage
+}, null, 2) + "\n")
+
+for (const [root, suffix] of [[interruptedHelperZeroRoot, "helper-zero"],
+  [interruptedCleanupFailureRoot, "cleanup-failure"]]) {
+  const directory = path.join(root, "pinote")
+  const expectedArchive = path.join(directory, `notes.json.recovery-${suffix}`)
+  const currentDirectory = path.join(directory, `notes.json.recovery-current-${suffix}`)
+  const currentArchive = path.join(currentDirectory, "notes.json")
+  const staged = path.join(directory, `.pinote-recovery-stage-${suffix}`)
+  fs.mkdirSync(currentDirectory, { mode: 0o700 })
+  fs.writeFileSync(expectedArchive, `{interrupted-${suffix}-original`)
+  fs.writeFileSync(currentArchive, `{interrupted-${suffix}-original`)
+  fs.writeFileSync(staged, valid("Interrupted replacement"))
+  fs.writeFileSync(path.join(directory, ".pinote-recovery-transaction.json"), JSON.stringify({
+    version: 1,
+    action: "restore",
+    expectedArchive,
+    currentArchive,
+    staged
+  }, null, 2) + "\n")
+}
+
+const primaryTarget = path.join(symlinkPrimaryRoot, "external-primary")
+fs.writeFileSync(primaryTarget, "{symlink-primary-target", { mode: 0o640 })
+fs.symlinkSync(primaryTarget, path.join(symlinkPrimaryRoot, "pinote/notes.json"))
+
+const backupTarget = path.join(symlinkBackupRoot, "external-backup")
+fs.writeFileSync(path.join(symlinkBackupRoot, "pinote/notes.json"), "{symlink-backup-primary")
+fs.writeFileSync(backupTarget, valid("Symlink backup target"), { mode: 0o640 })
+fs.symlinkSync(backupTarget, path.join(symlinkBackupRoot, "pinote/notes.json.bak"))
+
+const hardlinkPrimary = path.join(hardlinkPrimaryRoot, "pinote/notes.json")
+const hardlinkOutside = path.join(hardlinkPrimaryRoot, "outside-primary")
+fs.writeFileSync(hardlinkPrimary, "{hardlink-primary", { mode: 0o640 })
+fs.linkSync(hardlinkPrimary, hardlinkOutside)
+fs.writeFileSync(path.join(identicalPostinstallRoot, "pinote/notes.json"),
+  "{identical-postinstall-original")
+NODE
+mkfifo "$FIFO_PRIMARY_STATE_ROOT/pinote/notes.json"
+mkfifo "$FIFO_MARKER_STATE_ROOT/pinote/.pinote-recovery-transaction.json"
+printf '%s' '{fifo-original' > "$FIFO_STAGE_STATE_ROOT/pinote/notes.json.recovery-fifo"
+printf '%s' '{fifo-original' \
+  > "$FIFO_STAGE_STATE_ROOT/pinote/notes.json.recovery-current-fifo/notes.json"
+mkfifo "$FIFO_STAGE_STATE_ROOT/pinote/.pinote-recovery-stage-fifo"
+node - "$FIFO_STAGE_STATE_ROOT/pinote" <<'NODE'
+const fs = require("node:fs")
+const path = require("node:path")
+const root = process.argv[2]
+fs.writeFileSync(path.join(root, ".pinote-recovery-transaction.json"), JSON.stringify({
+  version: 1,
+  action: "restore",
+  expectedArchive: path.join(root, "notes.json.recovery-fifo"),
+  currentArchive: path.join(root, "notes.json.recovery-current-fifo/notes.json"),
+  staged: path.join(root, ".pinote-recovery-stage-fifo")
+}, null, 2) + "\n")
+NODE
+printf '%s' '{handoff-retry-original' > "$RECOVERY_HANDOFF_RETRY_ROOT/pinote/notes.json"
+printf '%s' '{shutdown-recovery-original' > "$RECOVERY_SHUTDOWN_ROOT/pinote/notes.json"
 cp "$ROOT/NotesModel.js" "$ROOT/NotesStoreQueue.js" "$ROOT/NotesStore.qml" "$CONFIG_ROOT/"
+cp "$ROOT/recovery-handoff" "$CONFIG_ROOT/"
 cp "$ROOT/tests/StoreSmoke.qml" "$CONFIG_ROOT/"
 
 set +e
@@ -162,11 +415,674 @@ if [[ $STATUS -ne 0 || $OUTPUT != *PINOTE_STORE_VERIFY_MISMATCH_OK* ]]; then
   exit 1
 fi
 
+run_recovery_case() {
+  local state_root=$1
+  local mode=$2
+  local marker=$3
+  local output status
+  set +e
+  output=$(QT_LOGGING_RULES="qt.qpa.services=false" XDG_STATE_HOME="$state_root" \
+    PINOTE_STORE_SMOKE_MODE="$mode" timeout 10s qs --no-color -p "$CONFIG_ROOT/StoreSmoke.qml" 2>&1)
+  status=$?
+  set -e
+  printf '%s\n' "$output"
+  if [[ $status -ne 0 || $output != *"$marker"* || $output == *PINOTE_STORE_SMOKE_FAILED* ]]; then
+    printf 'pinote store test: %s failed\n' "$mode" >&2
+    exit 1
+  fi
+  if [[ $output == *PINOTE_PRIVATE_SENTINEL_8f92* ]]; then
+    printf 'pinote store test: private note content leaked to logs\n' >&2
+    exit 1
+  fi
+}
+
+run_recovery_case "$RECOVERY_RESTORE_ROOT" recovery-restore PINOTE_STORE_RECOVERY_RESTORE_OK
+run_recovery_case "$RECOVERY_RESET_ROOT" recovery-reset PINOTE_STORE_RECOVERY_RESET_OK
+run_recovery_case "$RECOVERY_MISSING_ROOT" recovery-missing-backup PINOTE_STORE_RECOVERY_MISSING_BACKUP_OK
+run_recovery_case "$RECOVERY_INVALID_ROOT" recovery-invalid-backup PINOTE_STORE_RECOVERY_INVALID_BACKUP_OK
+run_recovery_case "$RECOVERY_BLANK_BACKUP_ROOT" recovery-invalid-backup PINOTE_STORE_RECOVERY_INVALID_BACKUP_OK
+run_recovery_case "$RECOVERY_WHITESPACE_BACKUP_ROOT" recovery-invalid-backup PINOTE_STORE_RECOVERY_INVALID_BACKUP_OK
+run_recovery_case "$RECOVERY_REPEAT_ROOT" recovery-repeat PINOTE_STORE_RECOVERY_REPEAT_OK
+run_recovery_case "$FIFO_PRIMARY_STATE_ROOT" expect-load-error PINOTE_STORE_LOAD_ERROR_OK
+run_recovery_case "$FIFO_MARKER_STATE_ROOT" interrupted-special-file \
+  PINOTE_STORE_INTERRUPTED_SPECIAL_FILE_OK
+run_recovery_case "$FIFO_STAGE_STATE_ROOT" interrupted-special-file \
+  PINOTE_STORE_INTERRUPTED_SPECIAL_FILE_OK
+run_recovery_case "$INTERRUPTED_RECOVERY_ROOT" interrupted-resume PINOTE_STORE_INTERRUPTED_RESUME_OK
+run_recovery_case "$INTERRUPTED_INSTALLED_ROOT" interrupted-resume PINOTE_STORE_INTERRUPTED_RESUME_OK
+set +e
+OUTPUT=$(QT_LOGGING_RULES="qt.qpa.services=false" XDG_STATE_HOME="$INTERRUPTED_HELPER_FAILURE_ROOT" \
+  PINOTE_RECOVERY_HELPER_PATH="$INTERRUPTED_HELPER_FAILURE_ROOT/missing-helper" \
+  PINOTE_RECOVERY_RETRY_HELPER_PATH="$CONFIG_ROOT/recovery-handoff" \
+  PINOTE_STORE_SMOKE_MODE=interrupted-resume-helper-failure \
+  timeout 10s qs --no-color -p "$CONFIG_ROOT/StoreSmoke.qml" 2>&1)
+STATUS=$?
+set -e
+printf '%s\n' "$OUTPUT"
+if [[ $STATUS -ne 0 || $OUTPUT != *PINOTE_STORE_INTERRUPTED_HELPER_RETRY_OK* \
+  || $OUTPUT == *PINOTE_STORE_SMOKE_FAILED* ]]; then
+  printf 'pinote store test: interrupted helper retry failed\n' >&2
+  exit 1
+fi
+set +e
+OUTPUT=$(QT_LOGGING_RULES="qt.qpa.services=false" XDG_STATE_HOME="$INTERRUPTED_HELPER_EXIT_ROOT" \
+  PINOTE_RECOVERY_HELPER_PATH=/usr/bin/false \
+  PINOTE_RECOVERY_RETRY_HELPER_PATH="$CONFIG_ROOT/recovery-handoff" \
+  PINOTE_STORE_SMOKE_MODE=interrupted-resume-helper-failure \
+  timeout 10s qs --no-color -p "$CONFIG_ROOT/StoreSmoke.qml" 2>&1)
+STATUS=$?
+set -e
+printf '%s\n' "$OUTPUT"
+if [[ $STATUS -ne 0 || $OUTPUT != *PINOTE_STORE_INTERRUPTED_HELPER_RETRY_OK* \
+  || $OUTPUT == *PINOTE_STORE_SMOKE_FAILED* ]]; then
+  printf 'pinote store test: interrupted nonzero helper retry failed\n' >&2
+  exit 1
+fi
+set +e
+OUTPUT=$(QT_LOGGING_RULES="qt.qpa.services=false" XDG_STATE_HOME="$INTERRUPTED_HELPER_ZERO_ROOT" \
+  PINOTE_RECOVERY_HELPER_PATH=/usr/bin/true \
+  PINOTE_RECOVERY_RETRY_HELPER_PATH="$CONFIG_ROOT/recovery-handoff" \
+  PINOTE_STORE_SMOKE_MODE=interrupted-resume-helper-failure \
+  timeout 10s qs --no-color -p "$CONFIG_ROOT/StoreSmoke.qml" 2>&1)
+STATUS=$?
+set -e
+printf '%s\n' "$OUTPUT"
+if [[ $STATUS -ne 0 || $OUTPUT != *PINOTE_STORE_INTERRUPTED_HELPER_RETRY_OK* \
+  || $OUTPUT == *PINOTE_STORE_SMOKE_FAILED* ]]; then
+  printf 'pinote store test: interrupted zero-exit helper retry failed\n' >&2
+  exit 1
+fi
+set +e
+OUTPUT=$(QT_LOGGING_RULES="qt.qpa.services=false" XDG_STATE_HOME="$INTERRUPTED_CLEANUP_FAILURE_ROOT" \
+  PINOTE_RECOVERY_HELPER_PATH="$CONFIG_ROOT/recovery-handoff" \
+  PINOTE_RECOVERY_RETRY_HELPER_PATH="$CONFIG_ROOT/recovery-handoff" \
+  PINOTE_RECOVERY_CLEANUP_HOOK="$INTERRUPTED_CLEANUP_FAILURE_ROOT/cleanup" \
+  PINOTE_RECOVERY_RETRY_CLEANUP_HOOK="" \
+  PINOTE_STORE_SMOKE_TIMEOUT_MS=12000 \
+  PINOTE_STORE_SMOKE_MODE=interrupted-resume-helper-failure \
+  timeout 15s qs --no-color -p "$CONFIG_ROOT/StoreSmoke.qml" 2>&1)
+STATUS=$?
+set -e
+printf '%s\n' "$OUTPUT"
+if [[ $STATUS -ne 0 || $OUTPUT != *PINOTE_STORE_INTERRUPTED_HELPER_RETRY_OK* \
+  || $OUTPUT == *PINOTE_STORE_SMOKE_FAILED* ]]; then
+  printf 'pinote store test: interrupted cleanup retry failed\n' >&2
+  exit 1
+fi
+run_recovery_case "$RECOVERY_ARCHIVE_FAILURE_ROOT" recovery-archive-failure PINOTE_STORE_RECOVERY_ARCHIVE_FAILURE_OK
+run_recovery_case "$UNSUPPORTED_ROOT" unsupported PINOTE_STORE_UNSUPPORTED_OK
+run_recovery_case "$RECOVERY_BACKUP_CHANGE_ROOT" recovery-backup-change \
+  PINOTE_STORE_RECOVERY_BACKUP_CHANGE_OK
+run_recovery_case "$RECOVERY_VERIFICATION_RACE_ROOT" recovery-verification-race \
+  PINOTE_STORE_RECOVERY_VERIFICATION_RACE_OK
+(umask 000; run_recovery_case "$RECOVERY_MODE_ROOT" recovery-reset PINOTE_STORE_RECOVERY_RESET_OK)
+run_recovery_case "$RECOVERY_SYMLINK_PRIMARY_ROOT" recovery-symlink-primary \
+  PINOTE_STORE_RECOVERY_SYMLINK_OK
+run_recovery_case "$RECOVERY_SYMLINK_BACKUP_ROOT" recovery-symlink-backup \
+  PINOTE_STORE_RECOVERY_SYMLINK_OK
+run_recovery_case "$RECOVERY_HARDLINK_PRIMARY_ROOT" recovery-hardlink-primary \
+  PINOTE_STORE_RECOVERY_HARDLINK_OK
+[[ $(<"$RECOVERY_HARDLINK_PRIMARY_ROOT/outside-primary") == '{hardlink-primary' \
+  && $(stat -c '%a' "$RECOVERY_HARDLINK_PRIMARY_ROOT/outside-primary") == 640 ]] || {
+  printf 'pinote store test: hard-linked primary changed an outside alias\n' >&2
+  exit 1
+}
+run_recovery_case "$RECOVERY_IDENTICAL_POSTINSTALL_ROOT" recovery-identical-postinstall-race \
+  PINOTE_STORE_RECOVERY_IDENTICAL_POSTINSTALL_OK
+
+set +e
+OUTPUT=$(QT_LOGGING_RULES="qt.qpa.services=false" XDG_STATE_HOME="$RECOVERY_WRITE_RETRY_ROOT" \
+  PINOTE_RECOVERY_STAGE_DELAY_MS=100 PINOTE_STORE_SMOKE_MODE=recovery-write-retry \
+  timeout 10s qs --no-color -p "$CONFIG_ROOT/StoreSmoke.qml" 2>&1)
+STATUS=$?
+set -e
+printf '%s\n' "$OUTPUT"
+if [[ $STATUS -ne 0 || $OUTPUT != *PINOTE_STORE_RECOVERY_WRITE_RETRY_OK* ]]; then
+  printf 'pinote store test: recovery-write-retry failed\n' >&2
+  exit 1
+fi
+
+set +e
+OUTPUT=$(QT_LOGGING_RULES="qt.qpa.services=false" XDG_STATE_HOME="$RECOVERY_HELPER_FAILURE_ROOT" \
+  PINOTE_RECOVERY_HELPER_PATH="$RECOVERY_HELPER_FAILURE_ROOT/missing-helper" \
+  PINOTE_STORE_SMOKE_MODE=recovery-helper-failure \
+  timeout 10s qs --no-color -p "$CONFIG_ROOT/StoreSmoke.qml" 2>&1)
+STATUS=$?
+set -e
+printf '%s\n' "$OUTPUT"
+if [[ $STATUS -ne 0 || $OUTPUT != *PINOTE_STORE_RECOVERY_HELPER_FAILURE_OK* ]]; then
+  printf 'pinote store test: recovery-helper-failure failed\n' >&2
+  exit 1
+fi
+
+RETRY_HOOK="$RECOVERY_HANDOFF_RETRY_ROOT/handoff"
+(
+  for _ in {1..500}; do [[ -e $RETRY_HOOK.ready ]] && break; sleep 0.01; done
+  [[ -e $RETRY_HOOK.ready ]] || exit 1
+  : > "$RETRY_HOOK.fail-after-move"
+  : > "$RETRY_HOOK.continue"
+  for _ in {1..500}; do [[ -e $RETRY_HOOK.moved ]] && break; sleep 0.01; done
+  [[ -e $RETRY_HOOK.moved ]] || exit 1
+) &
+RETRY_HOOK_PID=$!
+export PINOTE_RECOVERY_HANDOFF_HOOK=$RETRY_HOOK
+run_recovery_case "$RECOVERY_HANDOFF_RETRY_ROOT" recovery-handoff-retry \
+  PINOTE_STORE_RECOVERY_HANDOFF_RETRY_OK
+unset PINOTE_RECOVERY_HANDOFF_HOOK
+wait "$RETRY_HOOK_PID"
+
+export PINOTE_RECOVERY_HANDOFF_HOOK="$RECOVERY_SHUTDOWN_ROOT/shutdown-handoff"
+run_recovery_case "$RECOVERY_SHUTDOWN_ROOT" recovery-shutdown-marker \
+  PINOTE_STORE_RECOVERY_SHUTDOWN_MARKER_OK
+unset PINOTE_RECOVERY_HANDOFF_HOOK
+run_recovery_case "$RECOVERY_SHUTDOWN_ROOT" interrupted-abandon \
+  PINOTE_STORE_INTERRUPTED_ABANDON_OK
+
+HOOK="$RECOVERY_CONFLICT_ROOT/handoff"
+CLEANUP_HOOK="$RECOVERY_CLEANUP_RACE_ROOT/cleanup"
+(
+  for _ in {1..500}; do [[ -e $HOOK.ready ]] && break; sleep 0.01; done
+  [[ -e $HOOK.ready ]] || exit 1
+  mv -- "$RECOVERY_CONFLICT_ROOT/injected.json" "$RECOVERY_CONFLICT_ROOT/pinote/notes.json"
+  : > "$HOOK.continue"
+  for _ in {1..500}; do [[ -e $CLEANUP_HOOK.ready ]] && break; sleep 0.01; done
+  [[ -e $CLEANUP_HOOK.ready ]] || exit 1
+  mv -- "$RECOVERY_CONFLICT_ROOT/injected-cleanup.json" "$RECOVERY_CONFLICT_ROOT/pinote/notes.json"
+  : > "$CLEANUP_HOOK.continue"
+) &
+HOOK_PID=$!
+export PINOTE_RECOVERY_HANDOFF_HOOK=$HOOK
+export PINOTE_RECOVERY_CLEANUP_HOOK=$CLEANUP_HOOK
+run_recovery_case "$RECOVERY_CONFLICT_ROOT" recovery-conflict PINOTE_STORE_RECOVERY_CONFLICT_OK
+unset PINOTE_RECOVERY_HANDOFF_HOOK
+unset PINOTE_RECOVERY_CLEANUP_HOOK
+wait "$HOOK_PID"
+
+INPLACE_HOOK="$RECOVERY_INPLACE_ROOT/handoff"
+(
+  for _ in {1..500}; do [[ -e $INPLACE_HOOK.ready ]] && break; sleep 0.01; done
+  [[ -e $INPLACE_HOOK.ready ]] || exit 1
+  cp -- "$RECOVERY_INPLACE_ROOT/injected.json" "$RECOVERY_INPLACE_ROOT/pinote/notes.json"
+  : > "$INPLACE_HOOK.continue"
+) &
+INPLACE_HOOK_PID=$!
+export PINOTE_RECOVERY_HANDOFF_HOOK=$INPLACE_HOOK
+run_recovery_case "$RECOVERY_INPLACE_ROOT" recovery-inplace-change PINOTE_STORE_RECOVERY_INPLACE_OK
+unset PINOTE_RECOVERY_HANDOFF_HOOK
+wait "$INPLACE_HOOK_PID"
+
+IDENTICAL_HOOK="$RECOVERY_IDENTICAL_FAILURE_ROOT/handoff"
+(
+  for _ in {1..500}; do [[ -e $IDENTICAL_HOOK.ready ]] && break; sleep 0.01; done
+  [[ -e $IDENTICAL_HOOK.ready ]] || exit 1
+  cp -- "$RECOVERY_IDENTICAL_FAILURE_ROOT/injected.json" \
+    "$RECOVERY_IDENTICAL_FAILURE_ROOT/pinote/notes.json"
+  : > "$IDENTICAL_HOOK.continue"
+) &
+IDENTICAL_HOOK_PID=$!
+export PINOTE_RECOVERY_HANDOFF_HOOK=$IDENTICAL_HOOK
+run_recovery_case "$RECOVERY_IDENTICAL_FAILURE_ROOT" recovery-identical-handoff-failure \
+  PINOTE_STORE_RECOVERY_IDENTICAL_FAILURE_OK
+unset PINOTE_RECOVERY_HANDOFF_HOOK
+wait "$IDENTICAL_HOOK_PID"
+
+node - "$RECOVERY_IDENTICAL_FAILURE_ROOT" <<'NODE'
+const fs = require("node:fs")
+const assert = require("node:assert/strict")
+const root = process.argv[2]
+const names = fs.readdirSync(`${root}/pinote`)
+const expected = names.filter(name => name.startsWith("notes.json.recovery-")
+  && !name.startsWith("notes.json.recovery-current-"))
+assert.equal(expected.length, 1)
+assert.equal(fs.readFileSync(`${root}/pinote/${expected[0]}`, "utf8"), "{identical-original")
+assert.equal(names.some(name => name.startsWith("notes.json.recovery-current-")), false)
+assert.equal(names.some(name => name.startsWith(".pinote-recovery-")), false)
+assert.deepEqual(JSON.parse(fs.readFileSync(`${root}/pinote/notes.json`, "utf8")),
+  { version: 1, notes: [] })
+NODE
+
+AMBIENT_HELPER_ROOT="$TMP_ROOT/ambient-helper"
+mkdir -p "$AMBIENT_HELPER_ROOT"
+printf '%s' '{ambient-original' > "$AMBIENT_HELPER_ROOT/notes.json"
+cp -- "$AMBIENT_HELPER_ROOT/notes.json" "$AMBIENT_HELPER_ROOT/archive"
+cp -- "$RECOVERY_RESET_ROOT/pinote/notes.json" "$AMBIENT_HELPER_ROOT/staged"
+printf '%s' marker > "$AMBIENT_HELPER_ROOT/marker"
+PINOTE_RECOVERY_HANDOFF_HOOK="$AMBIENT_HELPER_ROOT/ambient-hook" \
+  "$ROOT/recovery-handoff" install "$AMBIENT_HELPER_ROOT/archive" \
+  "$AMBIENT_HELPER_ROOT/current-archive/notes.json" "$AMBIENT_HELPER_ROOT/staged" \
+  "$AMBIENT_HELPER_ROOT/notes.json" "$AMBIENT_HELPER_ROOT/marker"
+[[ ! -e $AMBIENT_HELPER_ROOT/ambient-hook.ready ]] || {
+  printf 'pinote store test: helper honored ambient test hook\n' >&2
+  exit 1
+}
+CAP_EFF=$("$ROOT/recovery-handoff" capabilities)
+[[ -n $CAP_EFF && ${CAP_EFF//0/} == "" ]] || {
+  printf 'pinote store test: helper regression did not run without effective capabilities\n' >&2
+  exit 1
+}
+
+HARDLINK_SECURE_ROOT="$TMP_ROOT/hardlink-secure-helper"
+mkdir -p "$HARDLINK_SECURE_ROOT"
+printf '%s' archive > "$HARDLINK_SECURE_ROOT/archive"
+printf '%s' staged > "$HARDLINK_SECURE_ROOT/staged"
+printf '%s' marker > "$HARDLINK_SECURE_ROOT/marker"
+chmod 640 "$HARDLINK_SECURE_ROOT/staged"
+(
+  for _ in {1..500}; do [[ -e $HARDLINK_SECURE_ROOT/hook.secure-ready ]] && break; sleep 0.01; done
+  [[ -e $HARDLINK_SECURE_ROOT/hook.secure-ready ]] || exit 1
+  ln -- "$HARDLINK_SECURE_ROOT/staged" "$HARDLINK_SECURE_ROOT/outside-stage"
+  : > "$HARDLINK_SECURE_ROOT/hook.secure-continue"
+) &
+HARDLINK_SECURE_PID=$!
+set +e
+"$ROOT/recovery-handoff" secure "$HARDLINK_SECURE_ROOT/staged" \
+  "$HARDLINK_SECURE_ROOT/archive" "$HARDLINK_SECURE_ROOT/marker" \
+  "$HARDLINK_SECURE_ROOT/hook"
+HARDLINK_SECURE_STATUS=$?
+set -e
+wait "$HARDLINK_SECURE_PID"
+[[ $HARDLINK_SECURE_STATUS -eq 75 \
+  && $(<"$HARDLINK_SECURE_ROOT/outside-stage") == staged \
+  && $(stat -c '%a' "$HARDLINK_SECURE_ROOT/outside-stage") == 640 ]] || {
+  printf 'pinote store test: hard-linked recovery input was not rejected safely\n' >&2
+  exit 1
+}
+
+HARDLINK_UNLINK_ROOT="$TMP_ROOT/hardlink-unlink-helper"
+mkdir -p "$HARDLINK_UNLINK_ROOT"
+printf '%s' staged > "$HARDLINK_UNLINK_ROOT/staged"
+printf '%s' archive > "$HARDLINK_UNLINK_ROOT/archive"
+printf '%s' marker > "$HARDLINK_UNLINK_ROOT/marker"
+chmod 640 "$HARDLINK_UNLINK_ROOT/staged"
+(
+  for _ in {1..500}; do [[ -e $HARDLINK_UNLINK_ROOT/hook.secure-ready ]] && break; sleep 0.01; done
+  [[ -e $HARDLINK_UNLINK_ROOT/hook.secure-ready ]] || exit 1
+  ln -- "$HARDLINK_UNLINK_ROOT/staged" "$HARDLINK_UNLINK_ROOT/outside-stage"
+  rm -- "$HARDLINK_UNLINK_ROOT/staged"
+  : > "$HARDLINK_UNLINK_ROOT/hook.secure-continue"
+) &
+HARDLINK_UNLINK_PID=$!
+set +e
+"$ROOT/recovery-handoff" secure "$HARDLINK_UNLINK_ROOT/staged" \
+  "$HARDLINK_UNLINK_ROOT/archive" "$HARDLINK_UNLINK_ROOT/marker" \
+  "$HARDLINK_UNLINK_ROOT/hook"
+HARDLINK_UNLINK_STATUS=$?
+set -e
+wait "$HARDLINK_UNLINK_PID"
+[[ $HARDLINK_UNLINK_STATUS -eq 75 && ! -e $HARDLINK_UNLINK_ROOT/staged \
+  && $(<"$HARDLINK_UNLINK_ROOT/outside-stage") == staged \
+  && $(stat -c '%a' "$HARDLINK_UNLINK_ROOT/outside-stage") == 640 ]] || {
+  printf 'pinote store test: unlinked recovery input escaped path validation\n' >&2
+  exit 1
+}
+
+RESTORE_CONFLICT_ROOT="$TMP_ROOT/restore-conflict-helper"
+mkdir -p "$RESTORE_CONFLICT_ROOT"
+printf '%s' '{restore-conflict-original' > "$RESTORE_CONFLICT_ROOT/notes.json"
+cp -- "$RESTORE_CONFLICT_ROOT/notes.json" "$RESTORE_CONFLICT_ROOT/archive"
+cp -- "$RECOVERY_RESET_ROOT/pinote/notes.json" "$RESTORE_CONFLICT_ROOT/staged"
+printf '%s' marker > "$RESTORE_CONFLICT_ROOT/marker"
+(
+  for _ in {1..500}; do [[ -e $RESTORE_CONFLICT_ROOT/hook.ready ]] && break; sleep 0.01; done
+  [[ -e $RESTORE_CONFLICT_ROOT/hook.ready ]] || exit 1
+  : > "$RESTORE_CONFLICT_ROOT/hook.continue"
+  for _ in {1..500}; do [[ -e $RESTORE_CONFLICT_ROOT/hook.moved ]] && break; sleep 0.01; done
+  [[ -e $RESTORE_CONFLICT_ROOT/hook.moved ]] || exit 1
+  printf '%s' '{restore-conflict-external' > "$RESTORE_CONFLICT_ROOT/notes.json"
+  ln -- "$RESTORE_CONFLICT_ROOT/staged" "$RESTORE_CONFLICT_ROOT/outside-stage"
+  : > "$RESTORE_CONFLICT_ROOT/hook.continue-install"
+) &
+RESTORE_CONFLICT_PID=$!
+set +e
+"$ROOT/recovery-handoff" install "$RESTORE_CONFLICT_ROOT/archive" \
+  "$RESTORE_CONFLICT_ROOT/current-archive/notes.json" "$RESTORE_CONFLICT_ROOT/staged" \
+  "$RESTORE_CONFLICT_ROOT/notes.json" "$RESTORE_CONFLICT_ROOT/marker" \
+  "$RESTORE_CONFLICT_ROOT/hook"
+RESTORE_CONFLICT_STATUS=$?
+set -e
+wait "$RESTORE_CONFLICT_PID"
+[[ $RESTORE_CONFLICT_STATUS -eq 75 \
+  && $(<"$RESTORE_CONFLICT_ROOT/notes.json") == '{restore-conflict-external' \
+  && $(<"$RESTORE_CONFLICT_ROOT/current-archive/notes.json") == '{restore-conflict-original' ]] || {
+  printf 'pinote store test: restore conflict overwrote or discarded a primary\n' >&2
+  exit 1
+}
+
+RESTORE_MODE_ROOT="$TMP_ROOT/restore-mode-helper"
+mkdir -p "$RESTORE_MODE_ROOT"
+printf '%s' '{restore-mode-original' > "$RESTORE_MODE_ROOT/notes.json"
+cp -- "$RESTORE_MODE_ROOT/notes.json" "$RESTORE_MODE_ROOT/archive"
+cp -- "$RECOVERY_RESET_ROOT/pinote/notes.json" "$RESTORE_MODE_ROOT/staged"
+printf '%s' marker > "$RESTORE_MODE_ROOT/marker"
+chmod 640 "$RESTORE_MODE_ROOT/notes.json" "$RESTORE_MODE_ROOT/staged"
+(
+  for _ in {1..500}; do [[ -e $RESTORE_MODE_ROOT/hook.ready ]] && break; sleep 0.01; done
+  [[ -e $RESTORE_MODE_ROOT/hook.ready ]] || exit 1
+  : > "$RESTORE_MODE_ROOT/hook.continue"
+  for _ in {1..500}; do [[ -e $RESTORE_MODE_ROOT/hook.moved ]] && break; sleep 0.01; done
+  [[ -e $RESTORE_MODE_ROOT/hook.moved ]] || exit 1
+  ln -- "$RESTORE_MODE_ROOT/staged" "$RESTORE_MODE_ROOT/outside-stage"
+  : > "$RESTORE_MODE_ROOT/hook.continue-install"
+) &
+RESTORE_MODE_PID=$!
+set +e
+"$ROOT/recovery-handoff" install "$RESTORE_MODE_ROOT/archive" \
+  "$RESTORE_MODE_ROOT/current-archive/notes.json" "$RESTORE_MODE_ROOT/staged" \
+  "$RESTORE_MODE_ROOT/notes.json" "$RESTORE_MODE_ROOT/marker" "$RESTORE_MODE_ROOT/hook"
+RESTORE_MODE_STATUS=$?
+set -e
+wait "$RESTORE_MODE_PID"
+[[ $RESTORE_MODE_STATUS -eq 75 && -f $RESTORE_MODE_ROOT/notes.json \
+  && ! -e $RESTORE_MODE_ROOT/current-archive \
+  && $(<"$RESTORE_MODE_ROOT/notes.json") == '{restore-mode-original' \
+  && $(stat -c '%a' "$RESTORE_MODE_ROOT/notes.json") == 640 ]] || {
+  printf 'pinote store test: failed handoff changed the restored primary mode\n' >&2
+  exit 1
+}
+
+HARDLINK_RACE_ROOT="$TMP_ROOT/hardlink-race-helper"
+mkdir -p "$HARDLINK_RACE_ROOT"
+printf '%s' '{hardlink-race-original' > "$HARDLINK_RACE_ROOT/notes.json"
+cp -- "$HARDLINK_RACE_ROOT/notes.json" "$HARDLINK_RACE_ROOT/archive"
+cp -- "$RECOVERY_RESET_ROOT/pinote/notes.json" "$HARDLINK_RACE_ROOT/staged"
+printf '%s' marker > "$HARDLINK_RACE_ROOT/marker"
+chmod 640 "$HARDLINK_RACE_ROOT/notes.json"
+(
+  for _ in {1..500}; do [[ -e $HARDLINK_RACE_ROOT/hook.ready ]] && break; sleep 0.01; done
+  [[ -e $HARDLINK_RACE_ROOT/hook.ready ]] || exit 1
+  ln -- "$HARDLINK_RACE_ROOT/notes.json" "$HARDLINK_RACE_ROOT/outside-primary"
+  : > "$HARDLINK_RACE_ROOT/hook.continue"
+) &
+HARDLINK_RACE_PID=$!
+set +e
+"$ROOT/recovery-handoff" install "$HARDLINK_RACE_ROOT/archive" \
+  "$HARDLINK_RACE_ROOT/current-archive/notes.json" "$HARDLINK_RACE_ROOT/staged" \
+  "$HARDLINK_RACE_ROOT/notes.json" "$HARDLINK_RACE_ROOT/marker" \
+  "$HARDLINK_RACE_ROOT/hook"
+HARDLINK_RACE_STATUS=$?
+set -e
+wait "$HARDLINK_RACE_PID"
+[[ $HARDLINK_RACE_STATUS -eq 75 && -f $HARDLINK_RACE_ROOT/notes.json \
+  && ! -e $HARDLINK_RACE_ROOT/current-archive \
+  && $(<"$HARDLINK_RACE_ROOT/outside-primary") == '{hardlink-race-original' \
+  && $(stat -c '%a' "$HARDLINK_RACE_ROOT/outside-primary") == 640 ]] || {
+  printf 'pinote store test: raced hard-linked primary was not restored safely\n' >&2
+  exit 1
+}
+
+PRELINK_RACE_ROOT="$TMP_ROOT/prelink-race-helper"
+mkdir -p "$PRELINK_RACE_ROOT"
+printf '%s' '{prelink-race-original' > "$PRELINK_RACE_ROOT/notes.json"
+cp -- "$PRELINK_RACE_ROOT/notes.json" "$PRELINK_RACE_ROOT/archive"
+cp -- "$RECOVERY_RESET_ROOT/pinote/notes.json" "$PRELINK_RACE_ROOT/staged"
+printf '%s' marker > "$PRELINK_RACE_ROOT/marker"
+chmod 640 "$PRELINK_RACE_ROOT/notes.json"
+chmod 600 "$PRELINK_RACE_ROOT/staged"
+: > "$PRELINK_RACE_ROOT/hook.continue"
+: > "$PRELINK_RACE_ROOT/hook.continue-install"
+: > "$PRELINK_RACE_ROOT/hook.pause-before-link"
+(
+  for _ in {1..500}; do [[ -e $PRELINK_RACE_ROOT/hook.prelink-ready ]] && break; sleep 0.01; done
+  [[ -e $PRELINK_RACE_ROOT/hook.prelink-ready ]] || exit 1
+  ln -- "$PRELINK_RACE_ROOT/staged" "$PRELINK_RACE_ROOT/outside-stage"
+  rm -- "$PRELINK_RACE_ROOT/staged"
+  : > "$PRELINK_RACE_ROOT/hook.prelink-continue"
+) &
+PRELINK_RACE_PID=$!
+set +e
+"$ROOT/recovery-handoff" install "$PRELINK_RACE_ROOT/archive" \
+  "$PRELINK_RACE_ROOT/current-archive/notes.json" "$PRELINK_RACE_ROOT/staged" \
+  "$PRELINK_RACE_ROOT/notes.json" "$PRELINK_RACE_ROOT/marker" "$PRELINK_RACE_ROOT/hook"
+PRELINK_RACE_STATUS=$?
+set -e
+wait "$PRELINK_RACE_PID"
+[[ $PRELINK_RACE_STATUS -eq 75 && -f $PRELINK_RACE_ROOT/notes.json \
+  && ! -e $PRELINK_RACE_ROOT/staged && ! -e $PRELINK_RACE_ROOT/current-archive \
+  && $(<"$PRELINK_RACE_ROOT/notes.json") == '{prelink-race-original' \
+  && $(stat -c '%a' "$PRELINK_RACE_ROOT/notes.json") == 640 \
+  && $(stat -c '%h' "$PRELINK_RACE_ROOT/outside-stage") == 1 ]] || {
+  printf 'pinote store test: pre-link hard-link race escaped post-install validation\n' >&2
+  exit 1
+}
+
+ROLLBACK_RACE_ROOT="$TMP_ROOT/rollback-race-helper"
+mkdir -p "$ROLLBACK_RACE_ROOT"
+printf '%s' '{rollback-race-original' > "$ROLLBACK_RACE_ROOT/notes.json"
+cp -- "$ROLLBACK_RACE_ROOT/notes.json" "$ROLLBACK_RACE_ROOT/archive"
+cp -- "$RECOVERY_RESET_ROOT/pinote/notes.json" "$ROLLBACK_RACE_ROOT/staged"
+printf '%s' marker > "$ROLLBACK_RACE_ROOT/marker"
+printf '%s' '{rollback-race-external' > "$ROLLBACK_RACE_ROOT/external-primary"
+: > "$ROLLBACK_RACE_ROOT/hook.continue"
+: > "$ROLLBACK_RACE_ROOT/hook.continue-install"
+: > "$ROLLBACK_RACE_ROOT/hook.pause-before-link"
+: > "$ROLLBACK_RACE_ROOT/hook.pause-before-rollback"
+(
+  for _ in {1..500}; do [[ -e $ROLLBACK_RACE_ROOT/hook.prelink-ready ]] && break; sleep 0.01; done
+  [[ -e $ROLLBACK_RACE_ROOT/hook.prelink-ready ]] || exit 1
+  ln -- "$ROLLBACK_RACE_ROOT/staged" "$ROLLBACK_RACE_ROOT/outside-stage"
+  rm -- "$ROLLBACK_RACE_ROOT/staged"
+  : > "$ROLLBACK_RACE_ROOT/hook.prelink-continue"
+  for _ in {1..500}; do [[ -e $ROLLBACK_RACE_ROOT/hook.rollback-ready ]] && break; sleep 0.01; done
+  [[ -e $ROLLBACK_RACE_ROOT/hook.rollback-ready ]] || exit 1
+  rm -- "$ROLLBACK_RACE_ROOT/notes.json"
+  mv -- "$ROLLBACK_RACE_ROOT/external-primary" "$ROLLBACK_RACE_ROOT/notes.json"
+  : > "$ROLLBACK_RACE_ROOT/hook.rollback-continue"
+) &
+ROLLBACK_RACE_PID=$!
+set +e
+"$ROOT/recovery-handoff" install "$ROLLBACK_RACE_ROOT/archive" \
+  "$ROLLBACK_RACE_ROOT/current-archive/notes.json" "$ROLLBACK_RACE_ROOT/staged" \
+  "$ROLLBACK_RACE_ROOT/notes.json" "$ROLLBACK_RACE_ROOT/marker" "$ROLLBACK_RACE_ROOT/hook"
+ROLLBACK_RACE_STATUS=$?
+set -e
+wait "$ROLLBACK_RACE_PID"
+[[ $ROLLBACK_RACE_STATUS -eq 75 \
+  && $(<"$ROLLBACK_RACE_ROOT/notes.json") == '{rollback-race-external' \
+  && $(<"$ROLLBACK_RACE_ROOT/current-archive/notes.json") == '{rollback-race-original' \
+  && $(stat -c '%h' "$ROLLBACK_RACE_ROOT/outside-stage") == 1 ]] || {
+  printf 'pinote store test: rollback removed a concurrent replacement primary\n' >&2
+  exit 1
+}
+
+FIFO_ROOT="$TMP_ROOT/fifo-helper"
+mkdir -p "$FIFO_ROOT"
+mkfifo "$FIFO_ROOT/notes.json"
+set +e
+timeout 2s "$ROOT/recovery-handoff" archive "$FIFO_ROOT/notes.json" \
+  "$FIFO_ROOT/archive" ""
+FIFO_STATUS=$?
+set -e
+[[ $FIFO_STATUS -eq 73 && ! -e $FIFO_ROOT/archive ]] || {
+  printf 'pinote store test: FIFO recovery input did not fail promptly\n' >&2
+  exit 1
+}
+
+LINK_FAILURE_ROOT="$TMP_ROOT/link-failure-helper"
+mkdir -p "$LINK_FAILURE_ROOT/hook"
+printf '%s' '{link-failure-original' > "$LINK_FAILURE_ROOT/notes.json"
+cp -- "$LINK_FAILURE_ROOT/notes.json" "$LINK_FAILURE_ROOT/archive"
+cp -- "$RECOVERY_RESET_ROOT/pinote/notes.json" "$LINK_FAILURE_ROOT/staged"
+printf '%s' marker > "$LINK_FAILURE_ROOT/marker"
+: > "$LINK_FAILURE_ROOT/hook.continue"
+: > "$LINK_FAILURE_ROOT/hook.continue-install"
+: > "$LINK_FAILURE_ROOT/hook.fail-link"
+set +e
+"$ROOT/recovery-handoff" install "$LINK_FAILURE_ROOT/archive" \
+  "$LINK_FAILURE_ROOT/current-archive/notes.json" "$LINK_FAILURE_ROOT/staged" \
+  "$LINK_FAILURE_ROOT/notes.json" "$LINK_FAILURE_ROOT/marker" "$LINK_FAILURE_ROOT/hook"
+LINK_STATUS=$?
+set -e
+[[ $LINK_STATUS -ne 0 && ! -e $LINK_FAILURE_ROOT/notes.json \
+  && -f $LINK_FAILURE_ROOT/current-archive/notes.json && -f $LINK_FAILURE_ROOT/staged ]] || {
+  printf 'pinote store test: hard-link failure was not fail-safe\n' >&2
+  exit 1
+}
+"$ROOT/recovery-handoff" resume "$LINK_FAILURE_ROOT/archive" \
+  "$LINK_FAILURE_ROOT/current-archive/notes.json" "$LINK_FAILURE_ROOT/staged" \
+  "$LINK_FAILURE_ROOT/notes.json" "$LINK_FAILURE_ROOT/marker"
+cmp -s -- "$LINK_FAILURE_ROOT/notes.json" "$RECOVERY_RESET_ROOT/pinote/notes.json" || {
+  printf 'pinote store test: hard-link failure resume installed the wrong payload\n' >&2
+  exit 1
+}
+[[ $(stat -c '%a' "$LINK_FAILURE_ROOT/notes.json") == 600 ]] || {
+  printf 'pinote store test: resumed hard-link payload has unsafe permissions\n' >&2
+  exit 1
+}
+
+LINK_RACE_ROOT="$TMP_ROOT/link-race-helper"
+mkdir -p "$LINK_RACE_ROOT"
+printf '%s' '{link-race-original' > "$LINK_RACE_ROOT/notes.json"
+cp -- "$LINK_RACE_ROOT/notes.json" "$LINK_RACE_ROOT/archive"
+cp -- "$RECOVERY_RESET_ROOT/pinote/notes.json" "$LINK_RACE_ROOT/staged"
+printf '%s' marker > "$LINK_RACE_ROOT/marker"
+: > "$LINK_RACE_ROOT/hook.continue"
+(
+  for _ in {1..500}; do [[ -e $LINK_RACE_ROOT/hook.moved ]] && break; sleep 0.01; done
+  [[ -e $LINK_RACE_ROOT/hook.moved ]] || exit 1
+  printf '%s' '{link-race-external' > "$LINK_RACE_ROOT/notes.json"
+  : > "$LINK_RACE_ROOT/hook.continue-install"
+) &
+LINK_RACE_PID=$!
+set +e
+"$ROOT/recovery-handoff" install "$LINK_RACE_ROOT/archive" \
+  "$LINK_RACE_ROOT/current-archive/notes.json" "$LINK_RACE_ROOT/staged" \
+  "$LINK_RACE_ROOT/notes.json" "$LINK_RACE_ROOT/marker" "$LINK_RACE_ROOT/hook"
+LINK_RACE_STATUS=$?
+set -e
+wait "$LINK_RACE_PID"
+[[ $LINK_RACE_STATUS -ne 0 \
+  && $(<"$LINK_RACE_ROOT/notes.json") == '{link-race-external' \
+  && $(<"$LINK_RACE_ROOT/current-archive/notes.json") == '{link-race-original' \
+  && -f $LINK_RACE_ROOT/staged ]] || {
+  printf 'pinote store test: concurrent hard-link destination was not preserved\n' >&2
+  exit 1
+}
+
+SYMLINK_RACE_ROOT="$TMP_ROOT/symlink-race-helper"
+mkdir -p "$SYMLINK_RACE_ROOT"
+printf '%s' '{symlink-race-original' > "$SYMLINK_RACE_ROOT/notes.json"
+cp -- "$SYMLINK_RACE_ROOT/notes.json" "$SYMLINK_RACE_ROOT/archive"
+cp -- "$RECOVERY_RESET_ROOT/pinote/notes.json" "$SYMLINK_RACE_ROOT/staged"
+printf '%s' marker > "$SYMLINK_RACE_ROOT/marker"
+printf '%s' outside > "$SYMLINK_RACE_ROOT/outside"
+chmod 640 "$SYMLINK_RACE_ROOT/outside"
+(
+  for _ in {1..500}; do [[ -e $SYMLINK_RACE_ROOT/hook.ready ]] && break; sleep 0.01; done
+  [[ -e $SYMLINK_RACE_ROOT/hook.ready ]] || exit 1
+  mv -- "$SYMLINK_RACE_ROOT/staged" "$SYMLINK_RACE_ROOT/retained-stage"
+  mv -- "$SYMLINK_RACE_ROOT/marker" "$SYMLINK_RACE_ROOT/retained-marker"
+  ln -s -- "$SYMLINK_RACE_ROOT/outside" "$SYMLINK_RACE_ROOT/staged"
+  ln -s -- "$SYMLINK_RACE_ROOT/outside" "$SYMLINK_RACE_ROOT/marker"
+  : > "$SYMLINK_RACE_ROOT/hook.continue"
+  for _ in {1..500}; do [[ -e $SYMLINK_RACE_ROOT/hook.moved ]] && break; sleep 0.01; done
+  [[ -e $SYMLINK_RACE_ROOT/hook.moved ]] || exit 1
+  : > "$SYMLINK_RACE_ROOT/hook.continue-install"
+) &
+SYMLINK_RACE_PID=$!
+set +e
+"$ROOT/recovery-handoff" install "$SYMLINK_RACE_ROOT/archive" \
+  "$SYMLINK_RACE_ROOT/current-archive/notes.json" "$SYMLINK_RACE_ROOT/staged" \
+  "$SYMLINK_RACE_ROOT/notes.json" "$SYMLINK_RACE_ROOT/marker" \
+  "$SYMLINK_RACE_ROOT/hook"
+SYMLINK_RACE_STATUS=$?
+set -e
+wait "$SYMLINK_RACE_PID"
+[[ $SYMLINK_RACE_STATUS -eq 75 && ! -e $SYMLINK_RACE_ROOT/current-archive \
+  && $(<"$SYMLINK_RACE_ROOT/notes.json") == '{symlink-race-original' \
+  && -f $SYMLINK_RACE_ROOT/retained-stage && -f $SYMLINK_RACE_ROOT/retained-marker \
+  && -L $SYMLINK_RACE_ROOT/staged && -L $SYMLINK_RACE_ROOT/marker \
+  && $(<"$SYMLINK_RACE_ROOT/outside") == outside \
+  && $(stat -c '%a' "$SYMLINK_RACE_ROOT/outside") == 640 ]] || {
+  printf 'pinote store test: raced recovery symlinks were not rejected safely\n' >&2
+  exit 1
+}
+
+DIRECTORY_RACE_ROOT="$TMP_ROOT/directory-race-helper"
+mkdir -p "$DIRECTORY_RACE_ROOT/outside-directory"
+printf '%s' '{directory-race-original' > "$DIRECTORY_RACE_ROOT/notes.json"
+cp -- "$DIRECTORY_RACE_ROOT/notes.json" "$DIRECTORY_RACE_ROOT/archive"
+cp -- "$RECOVERY_RESET_ROOT/pinote/notes.json" "$DIRECTORY_RACE_ROOT/staged"
+printf '%s' marker > "$DIRECTORY_RACE_ROOT/marker"
+printf '%s' outside > "$DIRECTORY_RACE_ROOT/outside-directory/outside"
+chmod 640 "$DIRECTORY_RACE_ROOT/outside-directory/outside"
+(
+  for _ in {1..500}; do [[ -e $DIRECTORY_RACE_ROOT/hook.ready ]] && break; sleep 0.01; done
+  [[ -e $DIRECTORY_RACE_ROOT/hook.ready ]] || exit 1
+  : > "$DIRECTORY_RACE_ROOT/hook.continue"
+  for _ in {1..500}; do [[ -e $DIRECTORY_RACE_ROOT/hook.moved ]] && break; sleep 0.01; done
+  [[ -e $DIRECTORY_RACE_ROOT/hook.moved ]] || exit 1
+  mv -- "$DIRECTORY_RACE_ROOT/current-archive" "$DIRECTORY_RACE_ROOT/retained-current"
+  ln -s -- "$DIRECTORY_RACE_ROOT/outside-directory" "$DIRECTORY_RACE_ROOT/current-archive"
+  : > "$DIRECTORY_RACE_ROOT/hook.continue-install"
+) &
+DIRECTORY_RACE_PID=$!
+set +e
+"$ROOT/recovery-handoff" install "$DIRECTORY_RACE_ROOT/archive" \
+  "$DIRECTORY_RACE_ROOT/current-archive/notes.json" "$DIRECTORY_RACE_ROOT/staged" \
+  "$DIRECTORY_RACE_ROOT/notes.json" "$DIRECTORY_RACE_ROOT/marker" \
+  "$DIRECTORY_RACE_ROOT/hook"
+DIRECTORY_RACE_STATUS=$?
+set -e
+wait "$DIRECTORY_RACE_PID"
+[[ $DIRECTORY_RACE_STATUS -eq 68 \
+  && $(<"$DIRECTORY_RACE_ROOT/outside-directory/outside") == outside \
+  && $(stat -c '%a' "$DIRECTORY_RACE_ROOT/outside-directory/outside") == 640 \
+  && $(<"$DIRECTORY_RACE_ROOT/notes.json") == '{directory-race-original' \
+  && -L $DIRECTORY_RACE_ROOT/current-archive \
+  && -d $DIRECTORY_RACE_ROOT/retained-current \
+  && ! -e $DIRECTORY_RACE_ROOT/retained-current/notes.json ]] || {
+  printf 'pinote store test: current-archive directory race was not contained\n' >&2
+  exit 1
+}
+
+RENAME_RETRY_ROOT="$TMP_ROOT/rename-retry-helper"
+mkdir -p "$RENAME_RETRY_ROOT"
+printf '%s' '{rename-retry-original' > "$RENAME_RETRY_ROOT/notes.json"
+cp -- "$RENAME_RETRY_ROOT/notes.json" "$RENAME_RETRY_ROOT/archive"
+cp -- "$RECOVERY_RESET_ROOT/pinote/notes.json" "$RENAME_RETRY_ROOT/staged"
+printf '%s' marker > "$RENAME_RETRY_ROOT/marker"
+(
+  for _ in {1..500}; do [[ -e $RENAME_RETRY_ROOT/hook.ready ]] && break; sleep 0.01; done
+  [[ -e $RENAME_RETRY_ROOT/hook.ready ]] || exit 1
+  mv -- "$RENAME_RETRY_ROOT/notes.json" "$RENAME_RETRY_ROOT/held-primary"
+  : > "$RENAME_RETRY_ROOT/hook.continue"
+) &
+RENAME_RETRY_PID=$!
+set +e
+"$ROOT/recovery-handoff" install "$RENAME_RETRY_ROOT/archive" \
+  "$RENAME_RETRY_ROOT/current-archive/notes.json" "$RENAME_RETRY_ROOT/staged" \
+  "$RENAME_RETRY_ROOT/notes.json" "$RENAME_RETRY_ROOT/marker" \
+  "$RENAME_RETRY_ROOT/hook"
+RENAME_RETRY_STATUS=$?
+set -e
+wait "$RENAME_RETRY_PID"
+[[ $RENAME_RETRY_STATUS -ne 0 && ! -e $RENAME_RETRY_ROOT/current-archive ]] || {
+  printf 'pinote store test: failed rename left a retry-poisoning archive directory\n' >&2
+  exit 1
+}
+mv -- "$RENAME_RETRY_ROOT/held-primary" "$RENAME_RETRY_ROOT/notes.json"
+"$ROOT/recovery-handoff" install "$RENAME_RETRY_ROOT/archive" \
+  "$RENAME_RETRY_ROOT/current-archive/notes.json" "$RENAME_RETRY_ROOT/staged" \
+  "$RENAME_RETRY_ROOT/notes.json" "$RENAME_RETRY_ROOT/marker"
+cmp -s -- "$RENAME_RETRY_ROOT/notes.json" "$RENAME_RETRY_ROOT/staged" || {
+  printf 'pinote store test: retry after failed rename installed the wrong payload\n' >&2
+  exit 1
+}
+
 node - "$STATE_ROOT/pinote/notes.json" "$STATE_ROOT/pinote/notes.json.bak" \
   "$RETRY_STATE_ROOT/pinote/notes.json" "$RETRY_STATE_ROOT/pinote/notes.json.bak" \
   "$SHUTDOWN_STATE_ROOT/pinote/notes.json" \
   "$BACKUP_STATE_ROOT/pinote/notes.json" "$BACKUP_STATE_ROOT/pinote/notes.json.bak" \
-  "$DIRTY_STATE_ROOT/pinote/notes.json" "$MISMATCH_STATE_ROOT/pinote/notes.json" <<'NODE'
+  "$DIRTY_STATE_ROOT/pinote/notes.json" "$MISMATCH_STATE_ROOT/pinote/notes.json" \
+  "$RECOVERY_RESTORE_ROOT" "$RECOVERY_RESET_ROOT" "$UNSUPPORTED_ROOT" \
+  "$RECOVERY_ARCHIVE_FAILURE_ROOT" "$RECOVERY_CONFLICT_ROOT" \
+  "$INTERRUPTED_RECOVERY_ROOT" "$RECOVERY_HANDOFF_RETRY_ROOT" \
+  "$RECOVERY_SHUTDOWN_ROOT" "$RECOVERY_BACKUP_CHANGE_ROOT" \
+  "$RECOVERY_VERIFICATION_RACE_ROOT" "$RECOVERY_MODE_ROOT" \
+  "$RECOVERY_REPEAT_ROOT" "$RECOVERY_WRITE_RETRY_ROOT" \
+  "$RECOVERY_HELPER_FAILURE_ROOT" "$RECOVERY_INPLACE_ROOT" \
+  "$INTERRUPTED_INSTALLED_ROOT" "$RECOVERY_SYMLINK_PRIMARY_ROOT" \
+  "$RECOVERY_SYMLINK_BACKUP_ROOT" <<'NODE'
 const fs = require("node:fs")
 const assert = require("node:assert/strict")
 
@@ -197,6 +1113,201 @@ assert.equal(JSON.parse(fs.readFileSync(process.argv[9], "utf8")).notes[0].conte
   "Preserved external note")
 assert.equal(JSON.parse(fs.readFileSync(process.argv[10], "utf8")).notes[0].content,
   "Verification mismatch")
+
+const restoreRoot = process.argv[11]
+const resetRoot = process.argv[12]
+const unsupportedRoot = process.argv[13]
+const archiveFailureRoot = process.argv[14]
+const conflictRoot = process.argv[15]
+const interruptedRoot = process.argv[16]
+const handoffRetryRoot = process.argv[17]
+const recoveryShutdownRoot = process.argv[18]
+const backupChangeRoot = process.argv[19]
+const verificationRaceRoot = process.argv[20]
+const modeRoot = process.argv[21]
+const repeatRoot = process.argv[22]
+const writeRetryRoot = process.argv[23]
+const helperFailureRoot = process.argv[24]
+const inplaceRoot = process.argv[25]
+const interruptedInstalledRoot = process.argv[26]
+const symlinkPrimaryRoot = process.argv[27]
+const symlinkBackupRoot = process.argv[28]
+const currentArchivePayload = (root, name) =>
+  fs.readFileSync(`${root}/pinote/${name}/notes.json`, "utf8")
+const restoreFiles = fs.readdirSync(`${restoreRoot}/pinote`)
+const restoreArchives = restoreFiles.filter(name => name.startsWith("notes.json.recovery-")
+  && !name.startsWith("notes.json.recovery-current-"))
+const restoreCurrentArchives = restoreFiles.filter(name => name.startsWith("notes.json.recovery-current-"))
+assert.equal(restoreArchives.length, 1)
+assert.equal(restoreCurrentArchives.length, 1)
+const restoreOriginal = fs.readFileSync(`${restoreRoot}/pinote/${restoreArchives[0]}`, "utf8")
+assert.equal(restoreOriginal, fs.readFileSync(`${restoreRoot}/original-primary`, "utf8"))
+assert.equal(currentArchivePayload(restoreRoot, restoreCurrentArchives[0]), restoreOriginal)
+assert.notEqual(fs.statSync(`${restoreRoot}/pinote/${restoreArchives[0]}`).ino,
+  fs.statSync(`${restoreRoot}/pinote/${restoreCurrentArchives[0]}/notes.json`).ino)
+assert.equal(JSON.parse(restoreOriginal).notes.length, 2)
+assert.equal(fs.existsSync(`${restoreRoot}/pinote/.pinote-recovery-transaction.json`), false)
+assert.equal(JSON.parse(fs.readFileSync(`${restoreRoot}/pinote/notes.json`, "utf8")).notes[0].content,
+  "Backup recovery note")
+
+const resetFiles = fs.readdirSync(`${resetRoot}/pinote`)
+const resetArchives = resetFiles.filter(name => name.startsWith("notes.json.recovery-")
+  && !name.startsWith("notes.json.recovery-current-"))
+const resetCurrentArchives = resetFiles.filter(name => name.startsWith("notes.json.recovery-current-"))
+assert.equal(resetArchives.length, 1)
+assert.equal(resetCurrentArchives.length, 1)
+assert.equal(fs.readFileSync(`${resetRoot}/pinote/${resetArchives[0]}`, "utf8"), "{PINOTE_PRIVATE_SENTINEL_8f92")
+assert.equal(currentArchivePayload(resetRoot, resetCurrentArchives[0]),
+  "{PINOTE_PRIVATE_SENTINEL_8f92")
+assert.equal(fs.existsSync(`${resetRoot}/pinote/.pinote-recovery-transaction.json`), false)
+assert.deepEqual(JSON.parse(fs.readFileSync(`${resetRoot}/pinote/notes.json`, "utf8")),
+  { version: 1, notes: [] })
+assert.equal(JSON.parse(fs.readFileSync(`${resetRoot}/pinote/notes.json.bak`, "utf8")).notes[0].content,
+  "PINOTE_PRIVATE_SENTINEL_8f92")
+assert.equal(fs.readFileSync(`${unsupportedRoot}/pinote/notes.json`, "utf8"),
+  '{"version":1.5,"unknown":"shape"}\n')
+assert.equal(fs.readFileSync(`${archiveFailureRoot}/pinote/notes.json`, "utf8"),
+  "{archive-must-remain")
+assert.equal(fs.readdirSync(`${archiveFailureRoot}/pinote`)
+  .filter(name => name.startsWith("notes.json.recovery-")).length, 0)
+
+assert.equal(JSON.parse(fs.readFileSync(`${conflictRoot}/pinote/notes.json`, "utf8")).notes[0].content,
+  "External cleanup note")
+assert.equal(JSON.parse(fs.readFileSync(`${conflictRoot}/pinote/notes.json.bak`, "utf8")).notes[0].content,
+  "Backup handoff note")
+const conflictArchives = fs.readdirSync(`${conflictRoot}/pinote`)
+  .filter(name => name.startsWith("notes.json.recovery-")
+    && !name.startsWith("notes.json.recovery-current-"))
+assert.equal(conflictArchives.length, 1)
+for (const archive of conflictArchives)
+  assert.equal(fs.readFileSync(`${conflictRoot}/pinote/${archive}`, "utf8"), "{conflict-original")
+
+assert.equal(JSON.parse(fs.readFileSync(`${interruptedRoot}/pinote/notes.json`, "utf8")).notes[0].content,
+  "Interrupted replacement")
+assert.equal(fs.readFileSync(`${interruptedRoot}/pinote/notes.json.recovery-interrupted`, "utf8"),
+  "{interrupted-original")
+assert.equal(currentArchivePayload(interruptedRoot, "notes.json.recovery-current-interrupted"),
+  "{interrupted-original")
+assert.equal(fs.existsSync(`${interruptedRoot}/pinote/.pinote-recovery-transaction.json`), false)
+assert.equal(fs.existsSync(`${interruptedRoot}/pinote/.pinote-recovery-stage-interrupted`), false)
+
+assert.equal(JSON.parse(fs.readFileSync(`${interruptedInstalledRoot}/pinote/notes.json`, "utf8"))
+  .notes[0].content, "Interrupted replacement")
+assert.equal(fs.existsSync(`${interruptedInstalledRoot}/pinote/notes.json.bak`), false)
+assert.equal(fs.existsSync(`${interruptedInstalledRoot}/pinote/.pinote-recovery-transaction.json`), false)
+assert.equal(fs.existsSync(`${interruptedInstalledRoot}/pinote/.pinote-recovery-stage-installed`), false)
+
+assert.equal(JSON.parse(fs.readFileSync(`${inplaceRoot}/pinote/notes.json`, "utf8")).notes[0].content,
+  "External in-place note")
+const inplaceNames = fs.readdirSync(`${inplaceRoot}/pinote`)
+const inplaceExpected = inplaceNames.filter(name => name.startsWith("notes.json.recovery-")
+  && !name.startsWith("notes.json.recovery-current-"))
+assert.equal(inplaceExpected.length, 1)
+assert.equal(fs.readFileSync(`${inplaceRoot}/pinote/${inplaceExpected[0]}`, "utf8"), "{inplace-original")
+assert.equal(inplaceNames.some(name => name.startsWith("notes.json.recovery-current-")), false)
+assert.equal(inplaceNames.some(name => name.startsWith(".pinote-recovery-")), false)
+
+assert.equal(fs.lstatSync(`${symlinkPrimaryRoot}/pinote/notes.json`).isSymbolicLink(), true)
+assert.equal(fs.readFileSync(`${symlinkPrimaryRoot}/external-primary`, "utf8"), "{symlink-primary-target")
+assert.equal(fs.statSync(`${symlinkPrimaryRoot}/external-primary`).mode & 0o777, 0o640)
+assert.equal(fs.readdirSync(`${symlinkPrimaryRoot}/pinote`)
+  .some(name => name.startsWith("notes.json.recovery-")), false)
+
+assert.equal(fs.lstatSync(`${symlinkBackupRoot}/pinote/notes.json.bak`).isSymbolicLink(), true)
+assert.equal(JSON.parse(fs.readFileSync(`${symlinkBackupRoot}/external-backup`, "utf8"))
+  .notes[0].content, "Symlink backup target")
+assert.equal(fs.statSync(`${symlinkBackupRoot}/external-backup`).mode & 0o777, 0o640)
+assert.equal(fs.readFileSync(`${symlinkBackupRoot}/pinote/notes.json`, "utf8"),
+  "{symlink-backup-primary")
+
+for (const [root, original] of [[handoffRetryRoot, "{handoff-retry-original"]]) {
+  const names = fs.readdirSync(`${root}/pinote`)
+  const expected = names.filter(name => name.startsWith("notes.json.recovery-")
+    && !name.startsWith("notes.json.recovery-current-"))
+  const current = names.filter(name => name.startsWith("notes.json.recovery-current-"))
+  assert.equal(expected.length, 1)
+  assert.equal(current.length, 1)
+  assert.equal(fs.readFileSync(`${root}/pinote/${expected[0]}`, "utf8"), original)
+  assert.equal(currentArchivePayload(root, current[0]), original)
+  assert.deepEqual(JSON.parse(fs.readFileSync(`${root}/pinote/notes.json`, "utf8")),
+    { version: 1, notes: [] })
+  assert.equal(fs.existsSync(`${root}/pinote/.pinote-recovery-transaction.json`), false)
+}
+
+const shutdownNames = fs.readdirSync(`${recoveryShutdownRoot}/pinote`)
+const shutdownExpected = shutdownNames.filter(name => name.startsWith("notes.json.recovery-")
+  && !name.startsWith("notes.json.recovery-current-"))
+assert.equal(shutdownExpected.length, 1)
+assert.equal(shutdownNames.filter(name => name.startsWith("notes.json.recovery-current-")).length, 0)
+assert.equal(fs.readFileSync(`${recoveryShutdownRoot}/pinote/${shutdownExpected[0]}`, "utf8"),
+  "{shutdown-recovery-original")
+assert.equal(fs.readFileSync(`${recoveryShutdownRoot}/pinote/notes.json`, "utf8"),
+  "{shutdown-recovery-original")
+assert.equal(fs.existsSync(`${recoveryShutdownRoot}/pinote/.pinote-recovery-transaction.json`), false)
+assert.equal(shutdownNames.some(name => name.startsWith(".pinote-recovery-stage-")), false)
+
+assert.equal(fs.readFileSync(`${backupChangeRoot}/pinote/notes.json`, "utf8"),
+  "{backup-change-primary")
+assert.equal(JSON.parse(fs.readFileSync(`${backupChangeRoot}/pinote/notes.json.bak`, "utf8"))
+  .notes[0].content, "Changed backup note")
+assert.equal(fs.readdirSync(`${backupChangeRoot}/pinote`)
+  .some(name => name.startsWith("notes.json.recovery-")
+    || name.startsWith(".pinote-recovery-")), false)
+
+assert.equal(JSON.parse(fs.readFileSync(`${verificationRaceRoot}/pinote/notes.json`, "utf8"))
+  .notes[0].content, "External verification note")
+assert.equal(fs.existsSync(`${verificationRaceRoot}/pinote/.pinote-recovery-transaction.json`), false)
+const raceNames = fs.readdirSync(`${verificationRaceRoot}/pinote`)
+const raceExpected = raceNames.filter(name => name.startsWith("notes.json.recovery-")
+  && !name.startsWith("notes.json.recovery-current-"))
+const raceCurrent = raceNames.filter(name => name.startsWith("notes.json.recovery-current-"))
+assert.equal(raceExpected.length, 1)
+assert.equal(raceCurrent.length, 1)
+assert.equal(fs.readFileSync(`${verificationRaceRoot}/pinote/${raceExpected[0]}`, "utf8"),
+  "{verification-race-primary")
+assert.equal(currentArchivePayload(verificationRaceRoot, raceCurrent[0]), "{verification-race-primary")
+assert.equal(raceNames.some(name => name.startsWith(".pinote-recovery-stage-")), false)
+
+const fileMode = path => fs.statSync(path).mode & 0o777
+assert.equal(fileMode(`${verificationRaceRoot}/pinote/${raceExpected[0]}`), 0o600)
+assert.equal(fileMode(`${verificationRaceRoot}/pinote/${raceCurrent[0]}`), 0o700)
+assert.equal(fileMode(`${verificationRaceRoot}/pinote/${raceCurrent[0]}/notes.json`), 0o644)
+assert.equal(fileMode(`${modeRoot}/pinote`), 0o700)
+assert.equal(fileMode(`${modeRoot}/pinote/notes.json`), 0o600)
+assert.equal(fileMode(`${modeRoot}/pinote/notes.json.bak`), 0o600)
+const modeNames = fs.readdirSync(`${modeRoot}/pinote`)
+const modeExpected = modeNames.find(name => name.startsWith("notes.json.recovery-")
+  && !name.startsWith("notes.json.recovery-current-"))
+const modeCurrent = modeNames.find(name => name.startsWith("notes.json.recovery-current-"))
+assert.equal(fileMode(`${modeRoot}/pinote/${modeExpected}`), 0o600)
+assert.equal(fileMode(`${modeRoot}/pinote/${modeCurrent}`), 0o700)
+assert.equal(fileMode(`${modeRoot}/pinote/${modeCurrent}/notes.json`), 0o600)
+
+const repeatNames = fs.readdirSync(`${repeatRoot}/pinote`)
+const repeatExpected = repeatNames.filter(name => name.startsWith("notes.json.recovery-")
+  && !name.startsWith("notes.json.recovery-current-"))
+const repeatCurrent = repeatNames.filter(name => name.startsWith("notes.json.recovery-current-"))
+assert.equal(repeatExpected.length, 2)
+assert.equal(repeatCurrent.length, 2)
+const repeatPayloads = repeatExpected.map(name => fs.readFileSync(`${repeatRoot}/pinote/${name}`, "utf8")).sort()
+assert.deepEqual(repeatPayloads, ["{first-damaged-primary", "{second-damaged-primary"].sort())
+assert.deepEqual(repeatCurrent.map(name => currentArchivePayload(repeatRoot, name)).sort(), repeatPayloads)
+assert.equal(repeatNames.some(name => name.startsWith(".pinote-recovery-")), false)
+
+const retryNames = fs.readdirSync(`${writeRetryRoot}/pinote`)
+const retryExpected = retryNames.find(name => name.startsWith("notes.json.recovery-")
+  && !name.startsWith("notes.json.recovery-current-"))
+const retryCurrent = retryNames.find(name => name.startsWith("notes.json.recovery-current-"))
+assert.equal(fs.readFileSync(`${writeRetryRoot}/pinote/${retryExpected}`, "utf8"), "{write-retry-original")
+assert.equal(currentArchivePayload(writeRetryRoot, retryCurrent), "{write-retry-original")
+assert.equal(JSON.parse(fs.readFileSync(`${writeRetryRoot}/pinote/notes.json.bak`, "utf8"))
+  .notes[0].content, "Write retry backup")
+assert.equal(retryNames.some(name => name.startsWith(".pinote-recovery-")), false)
+
+const helperNames = fs.readdirSync(`${helperFailureRoot}/pinote`)
+assert.equal(fs.readFileSync(`${helperFailureRoot}/pinote/notes.json`, "utf8"), "{helper-failure-primary")
+assert.equal(helperNames.some(name => name.startsWith("notes.json.recovery-")
+  || name.startsWith(".pinote-recovery-")), false)
 NODE
 
 printf 'Pinote store smoke test passed.\n'

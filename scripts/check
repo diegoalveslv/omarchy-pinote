@@ -25,6 +25,9 @@ command -v omarchy >/dev/null 2>&1 ||
 command -v node >/dev/null 2>&1 ||
   fail "node is required for development checks"
 
+command -v git >/dev/null 2>&1 ||
+  fail "git is required to verify runtime deliverables"
+
 if command -v qmllint >/dev/null 2>&1; then
   QMLLINT=$(command -v qmllint)
 elif [[ -x /usr/lib/qt6/bin/qmllint ]]; then
@@ -52,10 +55,14 @@ cp -R "$OMARCHY_SHELL_ROOT/Commons" "$QML_IMPORT_MIRROR/qs/Commons"
 cp -R "$OMARCHY_SHELL_ROOT/Ui" "$QML_IMPORT_MIRROR/qs/Ui"
 
 printf 'Validating manifest...\n'
+helper_index_entry=$(git -C "$ROOT" ls-files --stage -- recovery-handoff)
+[[ $helper_index_entry == 100755\ * ]] ||
+  fail "recovery-handoff must be tracked with executable mode 100755"
 VALIDATION_ROOT=$(mktemp -d)
 runtime_files=(
   manifest.json BarWidget.qml Panel.qml NotesStore.qml PanelState.qml
   ModalKeyRouter.qml NotesModel.js NotesStoreQueue.js RuntimeIdentity.js
+  recovery-handoff
 )
 for file in "${runtime_files[@]}"; do cp -- "$ROOT/$file" "$VALIDATION_ROOT/$file"; done
 omarchy plugin validate "$VALIDATION_ROOT"
@@ -69,6 +76,9 @@ for script in "$ROOT/scripts/check" "$ROOT/scripts/test-store" \
   [[ -x $script ]] || fail "$script must be executable"
   bash -n "$script"
 done
+[[ -x $ROOT/recovery-handoff ]] || fail "$ROOT/recovery-handoff must be executable"
+/usr/bin/python3 -c 'compile(open(__import__("sys").argv[1], encoding="utf-8").read(), __import__("sys").argv[1], "exec")' \
+  "$ROOT/recovery-handoff"
 
 printf 'Linting QML...\n'
 "$QMLLINT" -W 0 -I "$QML_IMPORT_MIRROR" \

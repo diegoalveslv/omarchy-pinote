@@ -25,6 +25,8 @@ Item {
   property alias draftNotice: panelState.draftNotice
   property alias pendingDeleteId: panelState.pendingDeleteId
   property alias deleteConfirmOpen: panelState.deleteConfirmOpen
+  property alias pendingRecoveryAction: panelState.pendingRecoveryAction
+  property alias recoveryConfirmOpen: panelState.recoveryConfirmOpen
   property bool focusPrimed: false
   readonly property var runtime: RuntimeIdentity.fromManifest(manifest)
 
@@ -158,6 +160,19 @@ Item {
     panelState.confirmDelete()
   }
 
+  function requestRecovery(action) {
+    recoveryConfirm.selectedIndex = 1
+    panelState.requestRecovery(action)
+  }
+
+  function cancelRecovery() {
+    panelState.cancelRecovery()
+  }
+
+  function confirmRecovery() {
+    panelState.confirmRecovery()
+  }
+
   function focusEditor(selectionMode) {
     Qt.callLater(function() {
       if (!root.opened || !root.editorVisible) return
@@ -234,6 +249,10 @@ Item {
 
         Keys.priority: Keys.BeforeItem
         Keys.onPressed: function(event) {
+          if (root.recoveryConfirmOpen) {
+            if (recoveryKeyRouter.handleKey(event)) event.accepted = true
+            return
+          }
           if (root.deleteConfirmOpen) {
             if (deleteKeyRouter.handleKey(event)) event.accepted = true
             return
@@ -354,6 +373,19 @@ Item {
             }
           }
 
+          Text {
+            Layout.fillWidth: true
+            visible: notesStore.status === "ready" && notesStore.recoveryArchivePath !== ""
+            text: "Recovery completed. The original file is archived at "
+              + notesStore.recoveryArchivePath + "."
+            textFormat: Text.PlainText
+            color: root.popupColor("text")
+            opacity: 0.72
+            font.family: root.fontToken("family")
+            font.pixelSize: root.fontToken("bodySmall")
+            wrapMode: Text.WrapAnywhere
+          }
+
           ColumnLayout {
             Layout.fillWidth: true
             Layout.fillHeight: true
@@ -393,8 +425,8 @@ Item {
 
             Button {
               Layout.alignment: Qt.AlignHCenter
-              visible: notesStore.status === "load-error"
-              text: "Retry load"
+              visible: notesStore.status === "load-error" || notesStore.status === "unsupported"
+              text: notesStore.status === "unsupported" ? "Check again" : "Retry load"
               foreground: root.popupColor("text")
               focusable: true
               bordered: true
@@ -413,12 +445,122 @@ Item {
             Text {
               Layout.fillWidth: true
               visible: notesStore.status === "recovery"
-              text: "The notes file is damaged. Valid notes are shown read-only; recovery actions will not alter the original file."
+              text: "The notes file is damaged. Valid notes are shown read-only. Restore and start-fresh archive the original before replacing it."
               textFormat: Text.PlainText
               color: Color.urgent
               font.family: root.fontToken("family")
               font.pixelSize: root.fontToken("bodySmall")
               wrapMode: Text.WordWrap
+            }
+
+            Text {
+              Layout.fillWidth: true
+              visible: notesStore.status === "recovery" && notesStore.recoveryRejectedRecords > 0
+              text: notesStore.recoveryRejectedRecords + (notesStore.recoveryRejectedRecords === 1
+                ? " invalid record was rejected." : " invalid records were rejected.")
+              textFormat: Text.PlainText
+              color: root.popupColor("text")
+              opacity: 0.72
+              font.family: root.fontToken("family")
+              font.pixelSize: root.fontToken("bodySmall")
+              wrapMode: Text.WordWrap
+            }
+
+            Text {
+              Layout.fillWidth: true
+              visible: notesStore.status === "recovery" && notesStore.issueSummary !== ""
+              text: notesStore.issueSummary
+              textFormat: Text.PlainText
+              color: root.popupColor("text")
+              opacity: 0.72
+              font.family: root.fontToken("family")
+              font.pixelSize: root.fontToken("bodySmall")
+              wrapMode: Text.WordWrap
+            }
+
+            Text {
+              Layout.fillWidth: true
+              visible: notesStore.status === "recovery"
+                && notesStore.recoveryBackupStatus !== "checking"
+                && notesStore.recoveryBackupMessage !== ""
+              text: notesStore.recoveryBackupMessage
+              textFormat: Text.PlainText
+              color: root.popupColor("text")
+              opacity: 0.72
+              font.family: root.fontToken("family")
+              font.pixelSize: root.fontToken("bodySmall")
+              wrapMode: Text.WordWrap
+            }
+
+            Text {
+              Layout.fillWidth: true
+              visible: notesStore.status === "recovery" && notesStore.recoveryOperation === "error"
+              text: notesStore.recoveryErrorMessage
+              textFormat: Text.PlainText
+              color: Color.urgent
+              font.family: root.fontToken("family")
+              font.pixelSize: root.fontToken("bodySmall")
+              wrapMode: Text.WordWrap
+            }
+
+            Text {
+              Layout.fillWidth: true
+              visible: notesStore.status === "recovery" && notesStore.recoveryBusy
+              text: "Checking notes file..."
+              textFormat: Text.PlainText
+              color: root.popupColor("text")
+              opacity: 0.72
+              font.family: root.fontToken("family")
+              font.pixelSize: root.fontToken("bodySmall")
+              wrapMode: Text.WordWrap
+            }
+
+            RowLayout {
+              Layout.fillWidth: true
+              visible: notesStore.status === "recovery"
+              spacing: root.spacingToken("controlGap")
+
+              Button {
+                visible: !notesStore.recoveryArchiveVerified
+                text: "Retry"
+                enabled: !notesStore.recoveryBusy
+                foreground: root.popupColor("text")
+                focusable: true
+                bordered: true
+                onClicked: notesStore.retryRecovery()
+              }
+
+              Item { Layout.fillWidth: true }
+
+              Button {
+                visible: notesStore.recoveryOperation === "error"
+                  && notesStore.recoveryArchiveVerified
+                text: "Retry recovery"
+                enabled: !notesStore.recoveryBusy
+                foreground: root.popupColor("text")
+                focusable: true
+                bordered: true
+                onClicked: notesStore.retryRecoveryWrite()
+              }
+
+              Button {
+                text: "Restore backup"
+                enabled: notesStore.recoveryBackupAvailable && !notesStore.recoveryBusy
+                  && !notesStore.recoveryArchiveVerified
+                foreground: root.popupColor("text")
+                focusable: true
+                bordered: true
+                onClicked: root.requestRecovery("restore")
+              }
+
+              Button {
+                text: "Start fresh"
+                enabled: !notesStore.recoveryBusy && !notesStore.recoveryArchiveVerified
+                foreground: Color.urgent
+                focusable: true
+                bordered: true
+                onClicked: root.requestRecovery("start-fresh")
+              }
             }
 
             Item {
@@ -584,7 +726,9 @@ Item {
                     Math.max(1, Style.normalBorderWidth))
                 }
 
-                onTextChanged: if (root.draftContent !== text) root.draftContent = text
+                onTextChanged: if (root.draftContent !== text) {
+                  panelState.updateDraftContent(text)
+                }
 
               }
             }
@@ -677,6 +821,32 @@ Item {
           cornerRadius: Style.cornerRadius
           onCanceled: root.cancelDelete()
           onConfirmed: root.confirmDelete()
+        }
+
+        ModalKeyRouter {
+          id: recoveryKeyRouter
+          opened: root.recoveryConfirmOpen
+          focusTarget: keyCatcher
+          dialog: recoveryConfirm
+        }
+
+        ConfirmDialog {
+          id: recoveryConfirm
+          anchors.fill: parent
+          z: 21
+          opened: root.recoveryConfirmOpen
+          message: root.pendingRecoveryAction === "restore"
+            ? "Restore the last-known-good backup? The damaged notes file will be archived first."
+            : "Start with no notes? The damaged notes file will be archived first."
+          confirmText: root.pendingRecoveryAction === "restore" ? "Restore" : "Start fresh"
+          background: root.popupColor("background")
+          foreground: root.popupColor("text")
+          scrim: Qt.rgba(0, 0, 0, 0.68)
+          selectedText: Color.accent
+          fontFamily: root.fontToken("family")
+          cornerRadius: Style.cornerRadius
+          onCanceled: root.cancelRecovery()
+          onConfirmed: root.confirmRecovery()
         }
       }
     }

@@ -1,0 +1,494 @@
+#!/usr/bin/python3
+
+import ctypes
+import errno
+import os
+import secrets
+import stat
+import sys
+import time
+
+
+AT_FDCWD = -100
+AT_SYMLINK_FOLLOW = 0x400
+RENAME_NOREPLACE = 1
+libc = ctypes.CDLL(None, use_errno=True)
+
+
+def fail(code):
+    raise SystemExit(code)
+
+
+def effective_capabilities():
+    with open("/proc/self/status", encoding="ascii") as status_file:
+        for line in status_file:
+            if line.startswith("CapEff:"):
+                return line.split()[1]
+    fail(66)
+
+
+def require_unique(fd, error_code=75):
+    if os.fstat(fd).st_nlink != 1:
+        fail(error_code)
+
+
+def require_named_file(fd, directory_fd, name, error_code=75):
+    try:
+        named = os.stat(name, dir_fd=directory_fd, follow_symlinks=False)
+    except OSError:
+        fail(error_code)
+    opened = os.fstat(fd)
+    if not stat.S_ISREG(named.st_mode) or (named.st_dev, named.st_ino) != (
+            opened.st_dev, opened.st_ino):
+        fail(error_code)
+
+
+def secure_unique(fd, directory_fd, name, hook=""):
+    opened = os.fstat(fd)
+    require_unique(fd)
+    require_named_file(fd, directory_fd, name)
+    original_mode = stat.S_IMODE(opened.st_mode)
+    wait_hook(hook, "secure-ready", "secure-continue")
+    require_unique(fd)
+    require_named_file(fd, directory_fd, name)
+    if original_mode != 0o600:
+        os.fchmod(fd, 0o600)
+    try:
+        require_unique(fd)
+        require_named_file(fd, directory_fd, name)
+    except BaseException:
+        os.fchmod(fd, original_mode)
+        os.fsync(fd)
+        raise
+    os.fsync(fd)
+
+
+def open_regular_at(directory_fd, name, flags=os.O_RDONLY, error_code=65,
+                    unique=False):
+    try:
+        fd = os.open(
+            name,
+            flags | os.O_CLOEXEC | os.O_NOFOLLOW | os.O_NONBLOCK,
+            dir_fd=directory_fd,
+        )
+    except OSError:
+        fail(error_code)
+    if not stat.S_ISREG(os.fstat(fd).st_mode):
+        os.close(fd)
+        fail(error_code)
+    if unique:
+        try:
+            require_unique(fd)
+        except BaseException:
+            os.close(fd)
+            raise
+    return fd
+
+
+def same_file_contents(left_fd, right_fd):
+    os.lseek(left_fd, 0, os.SEEK_SET)
+    os.lseek(right_fd, 0, os.SEEK_SET)
+    while True:
+        left = os.read(left_fd, 65536)
+        right = os.read(right_fd, 65536)
+        if left != right:
+            return False
+        if not left:
+            return True
+
+
+def link_fd_at(source_fd, directory_fd, name):
+    source = f"/proc/self/fd/{source_fd}"
+    result = libc.linkat(
+        AT_FDCWD,
+        ctypes.c_char_p(os.fsencode(source)),
+        directory_fd,
+        ctypes.c_char_p(os.fsencode(name)),
+        AT_SYMLINK_FOLLOW,
+    )
+    if result != 0:
+        error = ctypes.get_errno()
+        raise OSError(error, os.strerror(error), name)
+
+
+def rename_noreplace_at(source_directory_fd, source_name, destination_directory_fd,
+                        destination_name):
+    result = libc.renameat2(
+        source_directory_fd,
+        ctypes.c_char_p(os.fsencode(source_name)),
+        destination_directory_fd,
+        ctypes.c_char_p(os.fsencode(destination_name)),
+        RENAME_NOREPLACE,
+    )
+    if result != 0:
+        error = ctypes.get_errno()
+        raise OSError(error, os.strerror(error), destination_name)
+
+
+def unlink_open_file_at(directory_fd, name, fd):
+    try:
+        current = os.stat(name, dir_fd=directory_fd, follow_symlinks=False)
+    except FileNotFoundError:
+        return
+    opened = os.fstat(fd)
+    if (current.st_dev, current.st_ino) == (opened.st_dev, opened.st_ino):
+        os.unlink(name, dir_fd=directory_fd)
+
+
+def remove_primary_if_matches(state_fd, primary_name, staged_fd):
+    quarantine_name = ""
+    for _ in range(16):
+        quarantine_name = f".pinote-recovery-installed-{secrets.token_hex(8)}"
+        try:
+            rename_noreplace_at(state_fd, primary_name, state_fd, quarantine_name)
+            os.fsync(state_fd)
+            break
+        except OSError as error:
+            if error.errno != errno.EEXIST:
+                return False
+    else:
+        return False
+
+    try:
+        quarantined = os.stat(quarantine_name, dir_fd=state_fd, follow_symlinks=False)
+        staged = os.fstat(staged_fd)
+        matches = stat.S_ISREG(quarantined.st_mode) and (
+            quarantined.st_dev, quarantined.st_ino
+        ) == (staged.st_dev, staged.st_ino)
+    except OSError:
+        matches = False
+
+    if matches:
+        os.unlink(quarantine_name, dir_fd=state_fd)
+        os.fsync(state_fd)
+        return True
+
+    try:
+        rename_noreplace_at(state_fd, quarantine_name, state_fd, primary_name)
+        os.fsync(state_fd)
+    except OSError:
+        pass
+    return False
+
+
+def restore_regular(current_fd, current_directory_fd, current_name, state_fd, primary_name,
+                    current_directory_name):
+    try:
+        rename_noreplace_at(current_directory_fd, current_name, state_fd, primary_name)
+        os.fsync(current_directory_fd)
+        os.fsync(state_fd)
+    except OSError:
+        return False
+    try:
+        restored = os.stat(primary_name, dir_fd=state_fd, follow_symlinks=False)
+    except OSError:
+        return False
+    opened = os.fstat(current_fd)
+    if (restored.st_dev, restored.st_ino) != (opened.st_dev, opened.st_ino):
+        return False
+    try:
+        os.rmdir(current_directory_name, dir_fd=state_fd)
+        os.fsync(state_fd)
+    except OSError:
+        pass
+    return True
+
+
+def restore_nonregular(current_directory_fd, current_name, state_fd, primary_name,
+                       current_directory_name):
+    try:
+        moved = os.stat(current_name, dir_fd=current_directory_fd, follow_symlinks=False)
+    except OSError:
+        return False
+    try:
+        rename_noreplace_at(current_directory_fd, current_name, state_fd, primary_name)
+        os.fsync(current_directory_fd)
+        os.fsync(state_fd)
+    except OSError:
+        return False
+    try:
+        restored = os.stat(primary_name, dir_fd=state_fd, follow_symlinks=False)
+    except OSError:
+        return False
+    if (restored.st_dev, restored.st_ino) != (moved.st_dev, moved.st_ino):
+        return False
+    try:
+        os.rmdir(current_directory_name, dir_fd=state_fd)
+        os.fsync(state_fd)
+    except OSError:
+        pass
+    return True
+
+
+def wait_hook(hook, phase, continuation):
+    if not hook:
+        return
+    with open(f"{hook}.{phase}", "wb"):
+        pass
+    for _ in range(500):
+        if os.path.exists(f"{hook}.{continuation}"):
+            return
+        time.sleep(0.01)
+    fail(67)
+
+
+def signal_hook(hook, phase):
+    if not hook:
+        return
+    with open(f"{hook}.{phase}", "wb"):
+        pass
+
+
+def archive_primary(primary, archive, backup):
+    state_directory = os.path.dirname(primary)
+    if os.path.dirname(archive) != state_directory or (backup and os.path.dirname(backup) != state_directory):
+        fail(64)
+    state_fd = os.open(state_directory, os.O_RDONLY | os.O_DIRECTORY | os.O_CLOEXEC | os.O_NOFOLLOW)
+    primary_fd = open_regular_at(
+        state_fd, os.path.basename(primary), error_code=73, unique=True
+    )
+    backup_fd = open_regular_at(
+        state_fd, os.path.basename(backup), error_code=74, unique=True
+    ) if backup else -1
+    archive_fd = -1
+    try:
+        try:
+            archive_fd = os.open(
+                os.path.basename(archive),
+                os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_CLOEXEC | os.O_NOFOLLOW,
+                0o600,
+                dir_fd=state_fd,
+            )
+        except OSError:
+            fail(66)
+        while True:
+            chunk = os.read(primary_fd, 65536)
+            if not chunk:
+                break
+            view = memoryview(chunk)
+            while view:
+                written = os.write(archive_fd, view)
+                view = view[written:]
+        os.fsync(archive_fd)
+        os.fsync(state_fd)
+    except BaseException:
+        if archive_fd >= 0:
+            unlink_open_file_at(state_fd, os.path.basename(archive), archive_fd)
+            os.fsync(state_fd)
+        raise
+    finally:
+        if archive_fd >= 0:
+            os.close(archive_fd)
+        if backup_fd >= 0:
+            os.close(backup_fd)
+        os.close(primary_fd)
+        os.close(state_fd)
+
+
+def secure_files(paths, hook=""):
+    state_directory = os.path.dirname(paths[0])
+    if any(os.path.dirname(path) != state_directory for path in paths):
+        fail(64)
+    state_fd = os.open(state_directory, os.O_RDONLY | os.O_DIRECTORY | os.O_CLOEXEC | os.O_NOFOLLOW)
+    descriptors = []
+    try:
+        descriptors = [
+            open_regular_at(state_fd, os.path.basename(path), unique=True)
+            for path in paths
+        ]
+        for index, fd in enumerate(descriptors):
+            secure_unique(fd, state_fd, os.path.basename(paths[index]),
+                          hook if index == 0 else "")
+    finally:
+        for fd in descriptors:
+            os.close(fd)
+        os.close(state_fd)
+
+
+def install_staged(archive, current_archive, staged, primary, marker, hook):
+    state_directory = os.path.dirname(primary)
+    current_directory = os.path.dirname(current_archive)
+    paths = (archive, staged, marker)
+    if any(os.path.dirname(path) != state_directory for path in paths):
+        fail(64)
+    if os.path.dirname(current_directory) != state_directory:
+        fail(64)
+    state_fd = os.open(state_directory, os.O_RDONLY | os.O_DIRECTORY | os.O_CLOEXEC | os.O_NOFOLLOW)
+    archive_fd = open_regular_at(state_fd, os.path.basename(archive), unique=True)
+    staged_fd = open_regular_at(state_fd, os.path.basename(staged), unique=True)
+    marker_fd = open_regular_at(state_fd, os.path.basename(marker), unique=True)
+    current_fd = -1
+    current_directory_fd = -1
+    primary_name = os.path.basename(primary)
+    current_directory_name = os.path.basename(current_directory)
+    current_name = os.path.basename(current_archive)
+    try:
+        try:
+            os.stat(primary_name, dir_fd=state_fd, follow_symlinks=False)
+            primary_exists = True
+        except FileNotFoundError:
+            primary_exists = False
+        if primary_exists:
+            wait_hook(hook, "ready", "continue")
+            created_directory = False
+            try:
+                os.mkdir(current_directory_name, 0o700, dir_fd=state_fd)
+                created_directory = True
+                current_directory_fd = os.open(
+                    current_directory_name,
+                    os.O_RDONLY | os.O_DIRECTORY | os.O_CLOEXEC | os.O_NOFOLLOW,
+                    dir_fd=state_fd,
+                )
+                os.rename(primary_name, current_name, src_dir_fd=state_fd,
+                          dst_dir_fd=current_directory_fd)
+                os.fsync(current_directory_fd)
+                os.fsync(state_fd)
+            except OSError:
+                if current_directory_fd >= 0:
+                    os.close(current_directory_fd)
+                    current_directory_fd = -1
+                if created_directory:
+                    try:
+                        os.rmdir(current_directory_name, dir_fd=state_fd)
+                        os.fsync(state_fd)
+                    except OSError:
+                        pass
+                fail(68)
+            try:
+                current_fd = open_regular_at(current_directory_fd, current_name, unique=True)
+            except SystemExit:
+                restore_nonregular(current_directory_fd, current_name, state_fd, primary_name,
+                                   current_directory_name)
+                raise
+            if not same_file_contents(current_fd, archive_fd):
+                restore_regular(current_fd, current_directory_fd, current_name, state_fd,
+                                primary_name, current_directory_name)
+                fail(70)
+            signal_hook(hook, "moved")
+            if hook and os.path.exists(f"{hook}.fail-after-move"):
+                fail(71)
+            if hook:
+                for _ in range(500):
+                    if os.path.exists(f"{hook}.continue-install"):
+                        break
+                    time.sleep(0.01)
+                else:
+                    fail(67)
+        else:
+            try:
+                current_directory_fd = os.open(
+                    current_directory_name,
+                    os.O_RDONLY | os.O_DIRECTORY | os.O_CLOEXEC | os.O_NOFOLLOW,
+                    dir_fd=state_fd,
+                )
+            except OSError:
+                fail(68)
+            current_fd = open_regular_at(current_directory_fd, current_name, unique=True)
+            if not same_file_contents(current_fd, archive_fd):
+                fail(70)
+
+        try:
+            for fd, name in ((archive_fd, os.path.basename(archive)),
+                             (staged_fd, os.path.basename(staged)),
+                             (marker_fd, os.path.basename(marker))):
+                secure_unique(fd, state_fd, name)
+            require_unique(current_fd)
+            require_named_file(current_fd, current_directory_fd, current_name)
+        except SystemExit:
+            if primary_exists:
+                restore_regular(current_fd, current_directory_fd, current_name, state_fd,
+                                primary_name, current_directory_name)
+            raise
+        if hook and os.path.exists(f"{hook}.fail-link"):
+            fail(72)
+        try:
+            for fd, directory_fd, name in (
+                    (archive_fd, state_fd, os.path.basename(archive)),
+                    (current_fd, current_directory_fd, current_name),
+                    (staged_fd, state_fd, os.path.basename(staged)),
+                    (marker_fd, state_fd, os.path.basename(marker))):
+                require_unique(fd)
+                require_named_file(fd, directory_fd, name)
+        except SystemExit:
+            if primary_exists:
+                restore_regular(current_fd, current_directory_fd, current_name, state_fd,
+                                primary_name, current_directory_name)
+            raise
+        if hook and os.path.exists(f"{hook}.pause-before-link"):
+            wait_hook(hook, "prelink-ready", "prelink-continue")
+        try:
+            link_fd_at(staged_fd, state_fd, primary_name)
+            os.fsync(state_fd)
+        except OSError:
+            fail(69)
+        try:
+            require_named_file(staged_fd, state_fd, os.path.basename(staged))
+            require_named_file(staged_fd, state_fd, primary_name)
+            if os.fstat(staged_fd).st_nlink != 2:
+                fail(75)
+            try:
+                named_directory = os.stat(current_directory_name, dir_fd=state_fd,
+                                          follow_symlinks=False)
+            except OSError:
+                fail(68)
+            opened_directory = os.fstat(current_directory_fd)
+            if (named_directory.st_dev, named_directory.st_ino) != (
+                    opened_directory.st_dev, opened_directory.st_ino):
+                fail(68)
+        except SystemExit:
+            if hook and os.path.exists(f"{hook}.pause-before-rollback"):
+                wait_hook(hook, "rollback-ready", "rollback-continue")
+            remove_primary_if_matches(state_fd, primary_name, staged_fd)
+            if primary_exists:
+                restore_regular(current_fd, current_directory_fd, current_name, state_fd,
+                                primary_name, current_directory_name)
+            raise
+    finally:
+        if current_fd >= 0:
+            os.close(current_fd)
+        if current_directory_fd >= 0:
+            os.close(current_directory_fd)
+        os.close(marker_fd)
+        os.close(staged_fd)
+        os.close(archive_fd)
+        os.close(state_fd)
+
+
+def main():
+    os.umask(0o077)
+    if len(sys.argv) < 2:
+        fail(64)
+    mode = sys.argv[1]
+    if mode == "capabilities":
+        if len(sys.argv) != 2:
+            fail(64)
+        print(effective_capabilities())
+        return
+    if mode == "archive":
+        if len(sys.argv) != 5:
+            fail(64)
+        archive_primary(sys.argv[2], sys.argv[3], sys.argv[4])
+        return
+    if mode == "secure":
+        if len(sys.argv) not in (5, 6):
+            fail(64)
+        secure_files(sys.argv[2:5], sys.argv[5] if len(sys.argv) == 6 else "")
+        return
+    if mode == "install":
+        if len(sys.argv) not in (7, 8):
+            fail(64)
+        install_staged(*sys.argv[2:7], sys.argv[7] if len(sys.argv) == 8 else "")
+        return
+    if mode == "resume":
+        if len(sys.argv) != 7:
+            fail(64)
+        install_staged(*sys.argv[2:7], "")
+        return
+    fail(64)
+
+
+if __name__ == "__main__":
+    try:
+        main()
+    except OSError as error:
+        fail(66 if error.errno != errno.ELOOP else 73)

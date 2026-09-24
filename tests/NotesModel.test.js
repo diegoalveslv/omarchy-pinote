@@ -28,7 +28,10 @@ test("missing and blank input produce an empty writable collection", () => {
     assert.deepEqual(Model.parse(input), {
       status: "ready",
       collection: { version: 1, notes: [] },
-      issues: []
+      issues: [],
+      totalRecords: 0,
+      acceptedRecords: 0,
+      rejectedRecords: 0
     })
   }
 })
@@ -183,6 +186,18 @@ test("a mixture of valid and invalid records exposes a recovery preview", () => 
   assert.equal(result.status, "recoverable")
   assert.deepEqual(result.collection.notes, [valid])
   assert.deepEqual(issueCodes(result), ["empty-content"])
+  assert.equal(result.totalRecords, 2)
+  assert.equal(result.acceptedRecords, 1)
+  assert.equal(result.rejectedRecords, 1)
+})
+
+test("rejected record counts are independent of issue counts", () => {
+  const result = Model.parse(document([note(), {}]))
+
+  assert.equal(result.issues.length, 4)
+  assert.equal(result.totalRecords, 2)
+  assert.equal(result.acceptedRecords, 1)
+  assert.equal(result.rejectedRecords, 1)
 })
 
 test("every parser outcome maps to a persistence state", () => {

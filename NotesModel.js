@@ -12,21 +12,32 @@ function issue(code, path, message) {
   return { code: code, path: path, message: message }
 }
 
-function ready(collection) {
-  return { status: "ready", collection: collection, issues: [] }
+function parseResult(status, collection, issues, totalRecords, version) {
+  var acceptedRecords = collection && Array.isArray(collection.notes) ? collection.notes.length : 0
+  var result = {
+    status: status,
+    collection: collection,
+    issues: issues,
+    totalRecords: totalRecords || 0,
+    acceptedRecords: acceptedRecords,
+    rejectedRecords: Math.max(0, (totalRecords || 0) - acceptedRecords)
+  }
+  if (version !== undefined) result.version = version
+  return result
 }
 
-function recoverable(collection, issues) {
-  return { status: "recoverable", collection: collection, issues: issues }
+function ready(collection) {
+  return parseResult("ready", collection, [], collection.notes.length)
+}
+
+function recoverable(collection, issues, totalRecords) {
+  return parseResult("recoverable", collection, issues, totalRecords)
 }
 
 function unsupported(version) {
-  return {
-    status: "unsupported",
-    collection: null,
-    version: version,
-    issues: [issue("unsupported-version", "version", "The schema version is newer than this Pinote version supports.")]
-  }
+  return parseResult("unsupported", null,
+    [issue("unsupported-version", "version", "The schema version is newer than this Pinote version supports.")],
+    0, version)
 }
 
 function persistenceStateForParseResult(result) {
@@ -212,7 +223,7 @@ function parse(raw) {
   if (utf8ByteLength(serializeCollection({ version: SCHEMA_VERSION, notes: sizeNotes })) > MAX_CANONICAL_BYTES)
     issues.unshift(issue("file-too-large", "$", "The canonical notes file exceeds the size limit."))
 
-  return issues.length > 0 ? recoverable(collection, issues) : ready(collection)
+  return issues.length > 0 ? recoverable(collection, issues, data.notes.length) : ready(collection)
 }
 
 function findNoteIndex(collection, id) {

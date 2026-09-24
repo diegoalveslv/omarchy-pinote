@@ -147,6 +147,7 @@ mkdir -- "$STAGED"
 runtime_files=(
   manifest.json BarWidget.qml Panel.qml NotesStore.qml PanelState.qml
   ModalKeyRouter.qml NotesModel.js NotesStoreQueue.js RuntimeIdentity.js
+  recovery-handoff
 )
 for file in "${runtime_files[@]}"; do cp -- "$ROOT/$file" "$STAGED/$file"; done
 

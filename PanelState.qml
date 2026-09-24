@@ -13,6 +13,9 @@ QtObject {
   property string draftNotice: ""
   property string pendingDeleteId: ""
   property bool deleteConfirmOpen: false
+  property string pendingRecoveryAction: ""
+  property int pendingRecoveryGeneration: -1
+  property bool recoveryConfirmOpen: false
 
   readonly property bool editingNoteMissing: editingNoteId !== "" && noteIndex(editingNoteId) < 0
 
@@ -28,7 +31,13 @@ QtObject {
     }
 
     function onStatusChanged() {
+      if (root.deleteConfirmOpen && !root.store.canMutate) root.cancelDelete()
+      if (root.recoveryConfirmOpen && root.store.status !== "recovery") root.cancelRecovery()
       root.currentFocusRequested()
+    }
+
+    function onRecoveryGenerationChanged() {
+      if (root.recoveryConfirmOpen) root.cancelRecovery()
     }
   }
 
@@ -48,6 +57,11 @@ QtObject {
     if (result && result.issues && result.issues.length > 0)
       return String(result.issues[0].message || "The note could not be saved.")
     return "The note could not be saved."
+  }
+
+  function updateDraftContent(content) {
+    draftContent = content
+    draftError = ""
   }
 
   function syncSelection() {
@@ -144,6 +158,10 @@ QtObject {
     deleteConfirmOpen = false
     pendingDeleteId = ""
     if (id === "") return null
+    if (!store.canMutate) {
+      currentFocusRequested()
+      return { ok: false, issues: [] }
+    }
 
     var deletedIndex = noteIndex(id)
     var result = store.deleteNote(id)
@@ -168,9 +186,52 @@ QtObject {
     return result
   }
 
+  function requestRecovery(action) {
+    if (store.status !== "recovery" || store.recoveryBusy || store.recoveryArchiveVerified) return false
+    if (action !== "restore" && action !== "start-fresh") return false
+    if (action === "restore" && !store.recoveryBackupAvailable) return false
+    pendingRecoveryAction = action
+    pendingRecoveryGeneration = store.recoveryGeneration
+    recoveryConfirmOpen = true
+    return true
+  }
+
+  function cancelRecovery() {
+    recoveryConfirmOpen = false
+    pendingRecoveryAction = ""
+    pendingRecoveryGeneration = -1
+    currentFocusRequested()
+  }
+
+  function confirmRecovery() {
+    var action = pendingRecoveryAction
+    var generation = pendingRecoveryGeneration
+    if (store.status !== "recovery" || store.recoveryBusy
+        || store.recoveryArchiveVerified || generation !== store.recoveryGeneration
+        || (action === "restore" && !store.recoveryBackupAvailable)) {
+      recoveryConfirmOpen = false
+      pendingRecoveryAction = ""
+      pendingRecoveryGeneration = -1
+      currentFocusRequested()
+      return false
+    }
+    var started = action === "restore" ? store.restoreBackup()
+      : action === "start-fresh" ? store.startFresh() : false
+    if (started) {
+      recoveryConfirmOpen = false
+      pendingRecoveryAction = ""
+      pendingRecoveryGeneration = -1
+    }
+    currentFocusRequested()
+    return started
+  }
+
   function panelClosed() {
     deleteConfirmOpen = false
     pendingDeleteId = ""
+    recoveryConfirmOpen = false
+    pendingRecoveryAction = ""
+    pendingRecoveryGeneration = -1
   }
 
   function handleNotesChanged() {
