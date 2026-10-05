@@ -17,11 +17,11 @@
   and reports plugin paths, state presence, shell PID, output transforms, and
   available input tools.
 - Run destructive acceptance tests only against the generated
-  `diegoalveslv.pinote.live-test` plugin and its `pinote-live-test` state
+  `pinote.notes.live-test` plugin and its `pinote-live-test` state
   directory. Never run CRUD acceptance tests against production Pinote state.
 - `scripts/live-test` stages a complete runtime tree in a hidden sibling under
   the plugin root, validates it, and renames it atomically into
-  `~/.config/omarchy/plugins/diegoalveslv.pinote.live-test/`.
+  `~/.config/omarchy/plugins/pinote.notes.live-test/`.
 - The script must stop if the test installation or state already exists. Never
   overwrite an existing plugin directory. Generated installations carry an
   ownership marker that cleanup must verify before removal.

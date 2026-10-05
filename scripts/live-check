@@ -2,8 +2,8 @@
 
 set -euo pipefail
 
-PRODUCTION_ID=diegoalveslv.pinote
-TEST_ID=diegoalveslv.pinote.live-test
+PRODUCTION_ID=pinote.notes
+TEST_ID=pinote.notes.live-test
 PLUGIN_ROOT=${PINOTE_LIVE_PLUGIN_ROOT:-$HOME/.config/omarchy/plugins}
 
 if [[ ${XDG_STATE_HOME:-} == /* ]]; then

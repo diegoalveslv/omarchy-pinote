@@ -4,7 +4,7 @@ import "RuntimeIdentity.js" as RuntimeIdentity
 
 BarWidget {
   id: root
-  moduleName: "diegoalveslv.pinote"
+  moduleName: "pinote.notes"
   readonly property var runtime: RuntimeIdentity.forPlugin(moduleName, "")
 
   function runBarCommand(command) {

@@ -3,8 +3,8 @@ const assert = require("node:assert/strict")
 const RuntimeIdentity = require("../RuntimeIdentity.js")
 
 test("production identity preserves public runtime paths", () => {
-  assert.deepEqual(RuntimeIdentity.forPlugin("diegoalveslv.pinote", "Pinote"), {
-    pluginId: "diegoalveslv.pinote",
+  assert.deepEqual(RuntimeIdentity.forPlugin("pinote.notes", "Pinote"), {
+    pluginId: "pinote.notes",
     displayName: "Pinote",
     stateDirectoryName: "pinote",
     layerNamespace: "pinote",
@@ -13,8 +13,8 @@ test("production identity preserves public runtime paths", () => {
 })
 
 test("live-test identity is isolated and visibly named", () => {
-  assert.deepEqual(RuntimeIdentity.forPlugin("diegoalveslv.pinote.live-test", "Pinote (Live Test)"), {
-    pluginId: "diegoalveslv.pinote.live-test",
+  assert.deepEqual(RuntimeIdentity.forPlugin("pinote.notes.live-test", "Pinote (Live Test)"), {
+    pluginId: "pinote.notes.live-test",
     displayName: "Pinote (Live Test)",
     stateDirectoryName: "pinote-live-test",
     layerNamespace: "pinote-live-test",
