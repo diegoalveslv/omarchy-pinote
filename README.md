@@ -12,13 +12,13 @@ Review the repository and `manifest.json`, then install with Omarchy:
 omarchy plugin add https://github.com/diegoalveslv/omarchy-pinote.git --enable
 ```
 
-The plugin ID is `pinote.notes`.
+The plugin ID is `dlv.pinote`.
 
 ```bash
-omarchy plugin update pinote.notes
-omarchy plugin disable pinote.notes
-omarchy plugin enable pinote.notes
-omarchy plugin remove pinote.notes
+omarchy plugin update dlv.pinote
+omarchy plugin disable dlv.pinote
+omarchy plugin enable dlv.pinote
+omarchy plugin remove dlv.pinote
 ```
 
 ## Use
@@ -26,9 +26,9 @@ omarchy plugin remove pinote.notes
 Click the Pinote bar icon, or control the panel through shell IPC:
 
 ```bash
-omarchy-shell shell summon pinote.notes '{}'
-omarchy-shell shell hide pinote.notes
-omarchy-shell shell toggle pinote.notes '{}'
+omarchy-shell shell summon dlv.pinote '{}'
+omarchy-shell shell hide dlv.pinote
+omarchy-shell shell toggle dlv.pinote '{}'
 ```
 
 Pinote does not install a keyboard shortcut. If desired, add the toggle command

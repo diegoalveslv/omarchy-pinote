@@ -3,8 +3,8 @@
 set -euo pipefail
 
 ROOT=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
-PRODUCTION_ID=pinote.notes
-TEST_ID=pinote.notes.live-test
+PRODUCTION_ID=dlv.pinote
+TEST_ID=dlv.pinote.live-test
 TEST_NAME='Pinote (Live Test)'
 PLUGIN_ROOT=${PINOTE_LIVE_PLUGIN_ROOT:-$HOME/.config/omarchy/plugins}
 TARGET=$PLUGIN_ROOT/$TEST_ID
@@ -28,7 +28,7 @@ usage() {
 Usage: scripts/live-test [--keep] [--yes-production-idle]
        scripts/live-test --remove
 
-Creates an isolated pinote.notes.live-test installation. By default,
+Creates an isolated dlv.pinote.live-test installation. By default,
 the script waits for Enter after manual testing and then removes the generated
 plugin and state. Use --keep for agent-driven testing, then --remove afterward.
 EOF

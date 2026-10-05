@@ -1,5 +1,5 @@
-var PRODUCTION_ID = "pinote.notes"
-var LIVE_TEST_ID = "pinote.notes.live-test"
+var PRODUCTION_ID = "dlv.pinote"
+var LIVE_TEST_ID = "dlv.pinote.live-test"
 
 function safeSegment(value) {
   var normalized = String(value || "").replace(/[^A-Za-z0-9._-]/g, "-")
