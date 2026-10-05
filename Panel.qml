@@ -29,6 +29,7 @@ Item {
   property alias recoveryConfirmOpen: panelState.recoveryConfirmOpen
   property bool focusPrimed: false
   readonly property var runtime: RuntimeIdentity.fromManifest(manifest)
+  readonly property color scrimColor: Util.alpha(Color.background, 0.58)
 
   readonly property bool collectionVisible: notesStore.status === "ready"
     || notesStore.status === "saving"
@@ -218,7 +219,7 @@ Item {
 
     Rectangle {
       anchors.fill: parent
-      color: Qt.rgba(0, 0, 0, 0.45)
+      color: root.scrimColor
 
       MouseArea {
         anchors.fill: parent
@@ -524,6 +525,7 @@ Item {
                 visible: !notesStore.recoveryArchiveVerified
                 text: "Retry"
                 enabled: !notesStore.recoveryBusy
+                opacity: enabled ? 1 : 0.46
                 foreground: root.popupColor("text")
                 focusable: true
                 bordered: true
@@ -537,6 +539,7 @@ Item {
                   && notesStore.recoveryArchiveVerified
                 text: "Retry recovery"
                 enabled: !notesStore.recoveryBusy
+                opacity: enabled ? 1 : 0.46
                 foreground: root.popupColor("text")
                 focusable: true
                 bordered: true
@@ -547,6 +550,7 @@ Item {
                 text: "Restore backup"
                 enabled: notesStore.recoveryBackupAvailable && !notesStore.recoveryBusy
                   && !notesStore.recoveryArchiveVerified
+                opacity: enabled ? 1 : 0.46
                 foreground: root.popupColor("text")
                 focusable: true
                 bordered: true
@@ -556,6 +560,7 @@ Item {
               Button {
                 text: "Start fresh"
                 enabled: !notesStore.recoveryBusy && !notesStore.recoveryArchiveVerified
+                opacity: enabled ? 1 : 0.46
                 foreground: Color.urgent
                 focusable: true
                 bordered: true
@@ -625,10 +630,18 @@ Item {
                   width: notesList.width
                   height: Style.space(72)
                   radius: Style.cornerRadius
-                  color: selected ? Util.alpha(Color.accent, 0.14) : "transparent"
+                  color: selected
+                    ? Style.selectedFillFor(root.popupColor("text"), Color.accent)
+                    : noteMouse.pressed
+                      ? Style.pressedFillFor(root.popupColor("text"), Color.accent)
+                      : noteMouse.containsMouse
+                        ? Style.hoverFillFor(root.popupColor("text"), Color.accent)
+                        : "transparent"
                   borderSpec: selected
-                    ? Border.flat(Color.accent, Math.max(1, Style.normalBorderWidth))
-                    : Border.none()
+                    ? Border.controlSpec("selected", root.popupColor("text"), Color.accent)
+                    : noteMouse.containsMouse
+                      ? Border.controlSpec("hover-cursor", root.popupColor("text"), Color.accent)
+                      : Border.none()
 
                   Column {
                     anchors.fill: parent
@@ -661,6 +674,7 @@ Item {
                   }
 
                   MouseArea {
+                    id: noteMouse
                     anchors.fill: parent
                     hoverEnabled: true
                     cursorShape: notesStore.canMutate ? Qt.PointingHandCursor : Qt.ArrowCursor
@@ -720,10 +734,16 @@ Item {
                 topPadding: Style.space(12)
                 bottomPadding: Style.space(12)
                 background: BorderSurface {
-                  color: Util.alpha(root.popupColor("text"), 0.035)
+                  color: Style.controlFill(editor.activeFocus, editorHover.hovered,
+                    root.popupColor("text"), Color.accent)
                   radius: Style.cornerRadius
-                  borderSpec: Border.flat(Util.alpha(root.popupColor("text"), 0.28),
-                    Math.max(1, Style.normalBorderWidth))
+                  borderSpec: Border.flat(Style.controlBorder(editor.activeFocus,
+                    editorHover.hovered, root.popupColor("text"), Color.accent),
+                    Math.max(1, Style.controlBorderWidth(editor.activeFocus, editorHover.hovered)))
+                }
+
+                HoverHandler {
+                  id: editorHover
                 }
 
                 onTextChanged: if (root.draftContent !== text) {
@@ -815,7 +835,7 @@ Item {
           confirmText: "Delete"
           background: root.popupColor("background")
           foreground: root.popupColor("text")
-          scrim: Qt.rgba(0, 0, 0, 0.68)
+          scrim: root.scrimColor
           selectedText: Color.accent
           fontFamily: root.fontToken("family")
           cornerRadius: Style.cornerRadius
@@ -841,7 +861,7 @@ Item {
           confirmText: root.pendingRecoveryAction === "restore" ? "Restore" : "Start fresh"
           background: root.popupColor("background")
           foreground: root.popupColor("text")
-          scrim: Qt.rgba(0, 0, 0, 0.68)
+          scrim: root.scrimColor
           selectedText: Color.accent
           fontFamily: root.fontToken("family")
           cornerRadius: Style.cornerRadius

@@ -35,6 +35,35 @@ omarchy-shell shell rescanPlugins
 
 The development workflow never requires modifying `/usr/share/omarchy/`.
 
+## Installation And Lifecycle
+
+Review the repository and its `manifest.json` before enabling any third-party
+plugin. Once the public repository is available, install Pinote with Omarchy's
+supported plugin command:
+
+```bash
+omarchy plugin add https://github.com/diegoalveslv/omarchy-pinote.git --enable
+```
+
+The manifest ID is `diegoalveslv.pinote`. Manage an installed copy with:
+
+```bash
+omarchy plugin disable diegoalveslv.pinote
+omarchy plugin enable diegoalveslv.pinote
+omarchy plugin update diegoalveslv.pinote
+omarchy plugin remove diegoalveslv.pinote
+```
+
+Removing the plugin does not remove notes, backups, or recovery archives. To
+delete all Pinote data intentionally, first disable or remove the plugin, then
+remove its state directory only after confirming its contents:
+
+```bash
+rm -rI -- "${XDG_STATE_HOME:-$HOME/.local/state}/pinote"
+```
+
+Installation and shortcut configuration do not edit Hyprland configuration.
+
 ### Isolated Live Testing
 
 Do not run destructive acceptance tests against an installed production copy
@@ -75,10 +104,19 @@ omarchy-shell shell hide diegoalveslv.pinote
 omarchy-shell shell toggle diegoalveslv.pinote '{}'
 ```
 
-The suggested keyboard shortcut is `SUPER ALT + N`, bound to:
+No keyboard shortcut is installed or recommended by default. Use shell IPC:
 
 ```bash
 omarchy-shell shell toggle diegoalveslv.pinote '{}'
+```
+
+To add an optional shortcut, first check your effective bindings for a
+collision. Add the following line to `~/.config/hypr/bindings.lua` only after
+replacing `YOUR KEY COMBINATION` with an unassigned shortcut, then reload
+Hyprland through your usual Omarchy workflow:
+
+```lua
+o.bind("YOUR KEY COMBINATION", "Pinote", "omarchy-shell shell toggle diegoalveslv.pinote '{}'")
 ```
 
 ### Controls
@@ -166,6 +204,16 @@ provided by `qt6-declarative`. Set `OMARCHY_SHELL_ROOT` only when the Omarchy
 Shell QML modules are installed somewhere other than
 `/usr/share/omarchy/shell`.
 
+## MVP Limitations
+
+- Pinote stores plain-text notes only; it does not support rich text,
+  attachments, search, sync, or encryption.
+- Uncommitted drafts survive hiding the panel but not a shell restart, plugin
+  reload, disable, or crash.
+- Application bindings, launch detection, and triggered note windows are
+  post-MVP features.
+- Pinote does not currently provide an IPC method to create notes directly.
+
 ## License
 
-Pinote is available under the [MIT License](LICENSE).
+Pinote is available under the [Apache License 2.0](LICENSE).
